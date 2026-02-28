@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import type { AutoBundle, BundleFormData, BundleStatus, ResultHistoryItem } from '$lib/types/auto';
 import { generateId } from '$lib/utils/helpers';
+import { telegramConfigsStore } from '$lib/stores/telegramConfigs.svelte';
 
 const STORAGE_KEY = 'jukimbot-auto-bundles';
 
@@ -13,6 +14,9 @@ class AutoStore {
 	kakaoTokenExpired = $state(false);
 	kakaoTestResult = $state<string | null>(null);
 	kakaoTestLoading = $state(false);
+	telegramConfigured = $state(false);
+	telegramTestResult = $state<string | null>(null);
+	telegramTestLoading = $state(false);
 
 	private pollingTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -20,6 +24,7 @@ class AutoStore {
 		if (browser) {
 			this.loadFromStorage();
 			this.checkKakaoStatus();
+			this.checkTelegramStatus();
 			this.startPolling();
 		}
 	}
@@ -56,6 +61,9 @@ class AutoStore {
 			autoApplyText: data.autoApplyText,
 			autoReferUrl: data.autoReferUrl.filter((u) => u.trim()),
 			enableWebSearch: data.enableWebSearch,
+			telegramEnabled: data.telegramEnabled ?? false,
+			telegramBotId: (data.telegramBotId ?? '').trim(),
+			telegramChatId: (data.telegramChatId ?? '').trim(),
 			isActive: false,
 			isExecuting: false,
 			lastExecutedAt: null,
@@ -84,6 +92,9 @@ class AutoStore {
 		bundle.autoApplyText = data.autoApplyText;
 		bundle.autoReferUrl = data.autoReferUrl.filter((u) => u.trim());
 		bundle.enableWebSearch = data.enableWebSearch;
+		bundle.telegramEnabled = data.telegramEnabled ?? false;
+		bundle.telegramBotId = (data.telegramBotId ?? '').trim();
+		bundle.telegramChatId = (data.telegramChatId ?? '').trim();
 		bundle.updatedAt = new Date().toISOString();
 		this.persist();
 		return true;
@@ -125,13 +136,43 @@ class AutoStore {
 
 	// --- Execution ---
 
-	async executeBundle(id: string) {
+	async executeBundle(
+		id: string,
+		telegramOverrides?: {
+			telegramEnabled?: boolean;
+			telegramBotId?: string;
+			telegramChatId?: string;
+		}
+	) {
 		const bundle = this.bundles.find((b) => b.id === id);
 		if (!bundle || bundle.isExecuting) return;
 
 		bundle.isExecuting = true;
 
 		try {
+			const botId = telegramOverrides?.telegramBotId ?? bundle.telegramBotId;
+			const chatId = telegramOverrides?.telegramChatId ?? bundle.telegramChatId;
+			const bot = botId ? telegramConfigsStore.getBotById(botId) : undefined;
+			const chat = chatId ? telegramConfigsStore.getChatById(chatId) : undefined;
+			// Run Now 시 에디터 폼 상태 반영 (저장 안 해도 토글·봇·수신처 적용)
+			const telegramEnabled =
+				telegramOverrides?.telegramEnabled !== undefined
+					? telegramOverrides.telegramEnabled
+					: (bundle.telegramEnabled ?? false);
+			const telegramBotToken = bot?.botToken ?? '';
+			const telegramChatIdVal = chat?.chatId ?? '';
+			if (telegramEnabled && (!telegramBotToken || !telegramChatIdVal)) {
+				console.warn(
+					'[Auto] Telegram enabled but token or chatId missing. botId=',
+					botId,
+					'chatId=',
+					chatId,
+					'resolvedBot=',
+					!!bot,
+					'resolvedChat=',
+					!!chat
+				);
+			}
 			const response = await fetch('/api/auto/execute', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -139,7 +180,10 @@ class AutoStore {
 					title: bundle.title,
 					autoApplyText: bundle.autoApplyText,
 					autoReferUrl: bundle.autoReferUrl,
-					enableWebSearch: bundle.enableWebSearch
+					enableWebSearch: bundle.enableWebSearch,
+					telegramEnabled,
+					telegramBotToken,
+					telegramChatId: telegramChatIdVal
 				})
 			});
 
@@ -147,10 +191,20 @@ class AutoStore {
 			const now = new Date().toISOString();
 			const text = result.researchResultText || result.error || 'No result';
 			const success = !!result.success;
+			const telegramNote =
+				telegramEnabled && result.telegramSent === false
+					? result.telegramError
+						? `\n\n[Telegram 전송 실패] ${result.telegramError}`
+						: '\n\n[Telegram] 전송되지 않음 (봇/수신처 선택 후 저장하거나 .env에 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID 설정)'
+					: '';
 
 			bundle.researchResultText = text;
 			bundle.lastExecutedAt = now;
-			this.addToHistory(bundle, { executedAt: now, result: text, success });
+			this.addToHistory(bundle, {
+				executedAt: now,
+				result: text + telegramNote,
+				success
+			});
 		} catch (e) {
 			const now = new Date().toISOString();
 			const errorText = `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
@@ -168,6 +222,8 @@ class AutoStore {
 		if (!bundle) return;
 
 		try {
+			const bot = bundle.telegramBotId ? telegramConfigsStore.getBotById(bundle.telegramBotId) : undefined;
+			const chat = bundle.telegramChatId ? telegramConfigsStore.getChatById(bundle.telegramChatId) : undefined;
 			const response = await fetch('/api/auto/schedule', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -178,7 +234,10 @@ class AutoStore {
 					autoTimeSetting: bundle.autoTimeSetting,
 					autoApplyText: bundle.autoApplyText,
 					autoReferUrl: bundle.autoReferUrl,
-					enableWebSearch: bundle.enableWebSearch
+					enableWebSearch: bundle.enableWebSearch,
+					telegramEnabled: bundle.telegramEnabled ?? false,
+					telegramBotToken: bot?.botToken ?? '',
+					telegramChatId: chat?.chatId ?? ''
 				})
 			});
 
@@ -292,6 +351,46 @@ class AutoStore {
 		}
 	}
 
+	// --- Telegram ---
+
+	async checkTelegramStatus() {
+		try {
+			const response = await fetch('/api/auto/telegram/status');
+			if (response.ok) {
+				const data = await response.json();
+				this.telegramConfigured = data.configured === true;
+			} else {
+				this.telegramConfigured = false;
+			}
+		} catch {
+			this.telegramConfigured = false;
+		}
+	}
+
+	async sendTelegramTest(chatId: string, botToken: string) {
+		this.telegramTestLoading = true;
+		this.telegramTestResult = null;
+
+		try {
+			const response = await fetch('/api/auto/telegram/test', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ chatId: chatId.trim(), botToken: botToken.trim() })
+			});
+			const data = await response.json();
+
+			if (data.success) {
+				this.telegramTestResult = 'Telegram test message sent successfully!';
+			} else {
+				this.telegramTestResult = `Failed: ${data.error}`;
+			}
+		} catch (e) {
+			this.telegramTestResult = `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+		} finally {
+			this.telegramTestLoading = false;
+		}
+	}
+
 	private addToHistory(bundle: AutoBundle, item: ResultHistoryItem) {
 		if (!bundle.resultHistory) bundle.resultHistory = [];
 		const isDuplicate = bundle.resultHistory.some(
@@ -315,6 +414,9 @@ class AutoStore {
 				this.bundles = parsed.map((b: Record<string, unknown>) => ({
 					...b,
 					enableWebSearch: b.enableWebSearch ?? false,
+					telegramEnabled: b.telegramEnabled ?? false,
+					telegramBotId: String(b.telegramBotId ?? '').trim(),
+					telegramChatId: String(b.telegramChatId ?? '').trim(),
 					resultHistory: Array.isArray(b.resultHistory) ? b.resultHistory : [],
 					isActive: false,
 					isExecuting: false

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { AutoBundle, BundleFormData } from '$lib/types/auto';
 	import { autoStore } from '$lib/stores/auto.svelte';
+	import { telegramConfigsStore } from '$lib/stores/telegramConfigs.svelte';
 	import MarkdownRenderer from '../MarkdownRenderer.svelte';
 
 	let {
@@ -16,6 +17,9 @@
 	let autoApplyText = $state('');
 	let autoReferUrl = $state<string[]>(['']);
 	let enableWebSearch = $state(false);
+	let telegramEnabled = $state(false);
+	let telegramBotId = $state('');
+	let telegramChatId = $state('');
 	let titleError = $state<string | null>(null);
 	let expandedHistoryIndex = $state(-1);
 
@@ -29,6 +33,9 @@
 			autoApplyText = bundle.autoApplyText;
 			autoReferUrl = bundle.autoReferUrl.length ? [...bundle.autoReferUrl] : [''];
 			enableWebSearch = bundle.enableWebSearch ?? false;
+			telegramEnabled = bundle.telegramEnabled ?? false;
+			telegramBotId = (bundle.telegramBotId ?? '').trim();
+			telegramChatId = (bundle.telegramChatId ?? '').trim();
 			expandedHistoryIndex = -1;
 			if (bundle.autoTimeSetting >= 1440 && bundle.autoTimeSetting % 1440 === 0) {
 				intervalMode = 'days';
@@ -42,6 +49,9 @@
 			autoApplyText = '';
 			autoReferUrl = [''];
 			enableWebSearch = false;
+			telegramEnabled = false;
+			telegramBotId = '';
+			telegramChatId = '';
 			expandedHistoryIndex = -1;
 			intervalMode = 'minutes';
 			dayInput = 1;
@@ -107,7 +117,10 @@
 			autoTimeSetting,
 			autoApplyText,
 			autoReferUrl: autoReferUrl.filter((u) => u.trim()),
-			enableWebSearch
+			enableWebSearch,
+			telegramEnabled,
+			telegramBotId: telegramBotId.trim(),
+			telegramChatId: telegramChatId.trim()
 		};
 
 		if (isNew) {
@@ -122,7 +135,13 @@
 	}
 
 	function handleRunNow() {
-		if (bundle) autoStore.executeBundle(bundle.id);
+		if (!bundle) return;
+		// Run Now 시 현재 에디터 상태 그대로 사용 (텔레그램 토글·봇·수신처, 저장 안 해도 반영)
+		autoStore.executeBundle(bundle.id, {
+			telegramEnabled,
+			telegramBotId,
+			telegramChatId
+		});
 	}
 
 	function handleToggleActive() {
@@ -311,6 +330,85 @@
 					Prompt 내용을 기반으로 오늘 날짜의 인터넷 검색 결과를 가져와 첨부 URL과 함께 분석합니다.
 					검색 결과 상위 3개 페이지의 상세 내용도 추가로 수집합니다.
 				</p>
+			{/if}
+		</div>
+
+		<!-- Telegram -->
+		<div class="rounded-xl border border-chat-border bg-chat-raised/50 p-4">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<div class="flex h-8 w-8 items-center justify-center rounded-lg {telegramEnabled ? 'bg-sky-500/20 text-sky-400' : 'bg-slate-700/50 text-slate-500'}">
+						<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.611-.06-2.558-.293-.752-.185-1.311-.305-1.26-.463.126-.416.1-.803-.188-1.101-.288-.299-1.165-1.139-1.697-1.628-.653-.6-.146-.931.408-1.477.276-.272.562-.715.73-1.103.13-.31.12-.576-.04-.792-.161-.216-.438-.447-.877-.719-.44-.272-1.304-.951-1.846-1.364-.542-.413-.936-.626-1.18-.638-.24-.013-.557.04-.847.24-.29.2-.494.468-.6.804-.106.335-.087.706.057 1.106z"/>
+						</svg>
+					</div>
+					<div>
+						<p class="text-xs font-medium text-slate-300">Telegram</p>
+						<p class="text-[10px] text-slate-600">
+							{telegramEnabled ? '결과를 텔레그램으로 전송' : '결과를 텔레그램으로 보내지 않음'}
+						</p>
+					</div>
+				</div>
+				<button
+					onclick={() => (telegramEnabled = !telegramEnabled)}
+					class="relative h-6 w-11 rounded-full transition-colors {telegramEnabled ? 'bg-sky-500' : 'bg-slate-700'}"
+					aria-label="Toggle Telegram"
+				>
+					<span
+						class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform {telegramEnabled ? 'translate-x-5' : 'translate-x-0'}"
+					></span>
+				</button>
+			</div>
+			{#if telegramEnabled}
+				<div class="mt-3 space-y-3">
+					<div>
+						<label for="telegram-bot-select" class="block text-[10px] font-medium text-slate-500">봇 선택</label>
+						<select
+							id="telegram-bot-select"
+							bind:value={telegramBotId}
+							class="mt-1 w-full rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-sky-500/40"
+						>
+							<option value="">선택하세요</option>
+							{#each telegramConfigsStore.bots as bot (bot.id)}
+								<option value={bot.id}>{bot.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label for="telegram-chat-select" class="block text-[10px] font-medium text-slate-500">수신처 선택</label>
+						<div class="mt-1 flex flex-wrap items-center gap-2">
+							<select
+								id="telegram-chat-select"
+								bind:value={telegramChatId}
+								class="flex-1 min-w-[180px] rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-sky-500/40"
+							>
+								<option value="">선택하세요</option>
+								{#each telegramConfigsStore.chats as chat (chat.id)}
+									<option value={chat.id}>{chat.name}</option>
+								{/each}
+							</select>
+							<button
+								onclick={() => {
+									const bot = telegramBotId ? telegramConfigsStore.getBotById(telegramBotId) : undefined;
+									const chat = telegramChatId ? telegramConfigsStore.getChatById(telegramChatId) : undefined;
+									if (bot && chat) autoStore.sendTelegramTest(chat.chatId, bot.botToken);
+								}}
+								disabled={!telegramBotId || !telegramChatId || autoStore.telegramTestLoading}
+								class="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-400 transition-all hover:bg-sky-500/20 disabled:opacity-50"
+							>
+								{autoStore.telegramTestLoading ? '전송 중...' : '테스트 전송'}
+							</button>
+						</div>
+					</div>
+					{#if autoStore.telegramTestResult}
+						<p class="text-[10px] {autoStore.telegramTestResult.startsWith('Telegram') ? 'text-emerald-400' : 'text-red-400'}">
+							{autoStore.telegramTestResult}
+						</p>
+					{/if}
+					<p class="rounded-lg bg-sky-500/5 px-3 py-2 text-[10px] leading-relaxed text-slate-500">
+						상단 <strong>텔레그램 봇 · 수신처 설정</strong>에서 봇과 수신처를 등록한 뒤, 위에서 각각 선택하세요.
+					</p>
+				</div>
 			{/if}
 		</div>
 	</div>

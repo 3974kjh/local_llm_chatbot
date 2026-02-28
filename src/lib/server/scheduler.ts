@@ -2,6 +2,7 @@ import axios from 'axios';
 import { fetchMultipleUrls, fetchUrlContent } from './scraper';
 import { searchWeb, formatSearchContext } from './search';
 import { sendMessageChunked, isConnected as isKakaoConnected } from './kakao';
+import { sendMessageChunked as sendTelegramChunked } from './telegram';
 
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
@@ -13,6 +14,9 @@ interface ScheduledTask {
 	autoApplyText: string;
 	autoReferUrl: string[];
 	enableWebSearch: boolean;
+	telegramEnabled: boolean;
+	telegramBotToken: string;
+	telegramChatId: string;
 	timer: ReturnType<typeof setInterval>;
 	lastResult: string | null;
 	lastExecutedAt: string | null;
@@ -28,11 +32,14 @@ export async function executeBundle(
 	title: string,
 	autoApplyText: string,
 	autoReferUrl: string[],
-	enableWebSearch = false
+	enableWebSearch = false,
+	telegramEnabled = false,
+	telegramBotToken = '',
+	telegramChatId = ''
 ): Promise<{ researchResultText: string; success: boolean; error?: string }> {
 	try {
 		console.log(
-			`[Scheduler] Executing bundle "${title}" with ${autoReferUrl.length} URLs, webSearch=${enableWebSearch}`
+			`[Scheduler] Executing bundle "${title}" with ${autoReferUrl.length} URLs, webSearch=${enableWebSearch}, telegramEnabled=${telegramEnabled}, hasToken=${!!(telegramBotToken && telegramBotToken.trim())}, hasChatId=${!!(telegramChatId && telegramChatId.trim())}`
 		);
 
 		const urlResults = await fetchMultipleUrls(autoReferUrl);
@@ -206,11 +213,51 @@ OUTPUT:
 			console.warn('[Scheduler] Kakao not connected, skipping message send for:', title);
 		}
 
+		let telegramSent = false;
+		let telegramError: string | undefined;
+
+		console.log('[Scheduler] Telegram 조건:', {
+			telegramEnabled,
+			hasToken: !!(telegramBotToken && telegramBotToken.trim()),
+			hasChatId: !!(telegramChatId && telegramChatId.trim()),
+			resultLen: researchResultText?.length ?? 0
+		});
+
+		if (telegramEnabled && telegramBotToken && telegramChatId && researchResultText) {
+			const telegramResult = await sendTelegramChunked(
+				telegramChatId,
+				title,
+				researchResultText,
+				false,
+				telegramBotToken
+			);
+			telegramSent = telegramResult.success;
+			telegramError = telegramResult.error;
+			if (!telegramResult.success) {
+				console.error('[Scheduler] Telegram send failed for bundle:', title, telegramResult.error);
+			} else {
+				console.log(
+					`[Scheduler] Telegram messages sent: ${telegramResult.sentCount}/${telegramResult.totalChunks} chunks`
+				);
+			}
+		} else if (telegramEnabled && (!telegramBotToken || !telegramChatId)) {
+			console.warn(
+				'[Scheduler] Telegram enabled but Bot Token or Chat ID missing for:',
+				title,
+				'- token:',
+				telegramBotToken ? 'set' : 'empty',
+				'chatId:',
+				telegramChatId ? 'set' : 'empty'
+			);
+		}
+
 		return {
 			researchResultText,
 			success: true,
 			kakaoSent,
-			kakaoError
+			kakaoError,
+			telegramSent,
+			telegramError
 		} as { researchResultText: string; success: boolean; error?: string };
 	} catch (error: unknown) {
 		const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -238,7 +285,10 @@ async function runTask(task: ScheduledTask, label: string): Promise<void> {
 			task.title,
 			task.autoApplyText,
 			task.autoReferUrl,
-			task.enableWebSearch
+			task.enableWebSearch,
+			task.telegramEnabled,
+			task.telegramBotToken,
+			task.telegramChatId
 		);
 		task.lastResult = result.success ? result.researchResultText : `Error: ${result.error}`;
 		task.lastExecutedAt = new Date().toISOString();
@@ -264,7 +314,10 @@ export function startSchedule(
 	autoTimeSetting: number,
 	autoApplyText: string,
 	autoReferUrl: string[],
-	enableWebSearch = false
+	enableWebSearch = false,
+	telegramEnabled = false,
+	telegramBotToken = '',
+	telegramChatId = ''
 ): void {
 	stopSchedule(id);
 
@@ -277,6 +330,9 @@ export function startSchedule(
 		autoApplyText,
 		autoReferUrl,
 		enableWebSearch,
+		telegramEnabled,
+		telegramBotToken: (telegramBotToken || '').trim(),
+		telegramChatId: (telegramChatId || '').trim(),
 		timer: null as unknown as ReturnType<typeof setInterval>,
 		lastResult: null,
 		lastExecutedAt: null,

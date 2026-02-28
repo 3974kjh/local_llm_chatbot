@@ -7,13 +7,32 @@ export const POST: RequestHandler = async ({ request }) => {
 	const { action, id } = body;
 
 	if (action === 'start') {
-		const { title, autoTimeSetting, autoApplyText, autoReferUrl, enableWebSearch } = body;
+		const {
+			title,
+			autoTimeSetting,
+			autoApplyText,
+			autoReferUrl,
+			enableWebSearch,
+			telegramEnabled,
+			telegramBotToken,
+			telegramChatId
+		} = body;
 
 		if (!id || !title || !autoTimeSetting || !autoApplyText || !autoReferUrl?.length) {
 			return json({ success: false, error: 'Missing required fields' }, { status: 400 });
 		}
 
-		startSchedule(id, title, autoTimeSetting, autoApplyText, autoReferUrl, !!enableWebSearch);
+		startSchedule(
+			id,
+			title,
+			autoTimeSetting,
+			autoApplyText,
+			autoReferUrl,
+			!!enableWebSearch,
+			!!telegramEnabled,
+			(telegramBotToken ?? '').trim(),
+			(telegramChatId ?? '').trim()
+		);
 		return json({ success: true });
 	}
 

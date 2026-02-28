@@ -2,7 +2,10 @@
 	import BotAvatar from '../BotAvatar.svelte';
 	import ModeToggle from '../ModeToggle.svelte';
 	import BundleEditor from './BundleEditor.svelte';
+	import TelegramSettingsModal from './TelegramSettingsModal.svelte';
 	import { autoStore } from '$lib/stores/auto.svelte';
+
+	let telegramSettingsOpen = $state(false);
 
 	function formatTimer(minutes: number): string {
 		if (minutes >= 1440) {
@@ -171,8 +174,22 @@
 				</div>
 			</div>
 
-			<ModeToggle />
+			<div class="flex items-center gap-2">
+				<button
+					onclick={() => (telegramSettingsOpen = true)}
+					class="flex items-center gap-2 rounded-lg border border-chat-border px-3 py-2 text-xs text-slate-400 transition-colors hover:bg-chat-raised hover:text-sky-400"
+					aria-label="텔레그램 봇 설정"
+				>
+					<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.611-.06-2.558-.293-.752-.185-1.311-.305-1.26-.463.126-.416.1-.803-.188-1.101-.288-.299-1.165-1.139-1.697-1.628-.653-.6-.146-.931.408-1.477.276-.272.562-.715.73-1.103.13-.31.12-.576-.04-.792-.161-.216-.438-.447-.877-.719-.44-.272-1.304-.951-1.846-1.364-.542-.413-.936-.626-1.18-.638-.24-.013-.557.04-.847.24-.29.2-.494.468-.6.804-.106.335-.087.706.057 1.106z"/>
+					</svg>
+					텔레그램 봇 설정
+				</button>
+				<ModeToggle />
+			</div>
 		</header>
+
+		<TelegramSettingsModal bind:open={telegramSettingsOpen} />
 
 		<!-- Content -->
 		{#if autoStore.isCreating}

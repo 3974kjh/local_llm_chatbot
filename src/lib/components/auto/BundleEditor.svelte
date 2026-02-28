@@ -27,9 +27,15 @@
 	let scheduleTime = $state('09:00');
 	let scheduleDays = $state(1);
 	let dayInput = $state(1);
+	let previousBundleId = $state<string | null>(null);
 
+	// 번들 전환 시에만 폼을 번들 값으로 동기화 (저장 전에 스케줄 타입 등이 덮어씌워지지 않도록)
 	$effect(() => {
-		if (bundle) {
+		const id = bundle?.id ?? null;
+		const isSwitch = id !== previousBundleId;
+		if (isSwitch) previousBundleId = id;
+
+		if (bundle && isSwitch) {
 			title = bundle.title;
 			autoTimeSetting = bundle.autoTimeSetting;
 			scheduleType = (bundle.scheduleType ?? 'minutes') as ScheduleType;
@@ -48,7 +54,8 @@
 				dayInput = bundle.autoTimeSetting / 1440;
 				scheduleDays = dayInput;
 			}
-		} else if (isNew) {
+		} else if (isNew && isSwitch) {
+			previousBundleId = null;
 			title = '';
 			autoTimeSetting = 60;
 			scheduleType = 'minutes';
@@ -64,6 +71,9 @@
 			expandedHistoryIndex = -1;
 		}
 	});
+
+	/** Run Now 실행 중이거나 스케줄 활성 중에는 상단 설정 입력 불가 */
+	const settingsLocked = $derived(bundle ? bundle.isExecuting || bundle.isActive : false);
 
 	function switchScheduleType(mode: ScheduleType) {
 		scheduleType = mode;
@@ -178,7 +188,12 @@
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto">
-	<div class="flex-1 space-y-5 p-5">
+	<div class="flex-1 space-y-5 p-5" class:opacity-60={settingsLocked} class:pointer-events-none={settingsLocked}>
+		{#if settingsLocked}
+			<p class="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+				Run Now 실행 중이거나 스케줄이 켜져 있어 설정을 변경할 수 없습니다. 실행을 마치거나 스케줄을 중지하면 편집할 수 있습니다.
+			</p>
+		{/if}
 		<!-- Title -->
 		<div>
 			<label for="bundle-title" class="mb-1.5 block text-xs font-medium text-slate-400"
@@ -190,7 +205,8 @@
 				bind:value={title}
 				oninput={() => (titleError = null)}
 				placeholder="Enter bundle title..."
-				class="w-full rounded-xl border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 {titleError
+				disabled={settingsLocked}
+				class="w-full rounded-xl border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 disabled:opacity-70 {titleError
 					? 'border-red-500/50'
 					: 'border-chat-border focus:border-violet-500/40'}"
 			/>
@@ -213,24 +229,30 @@
 				</p>
 				<div class="flex overflow-hidden rounded-lg border border-chat-border text-[10px]">
 					<button
+						type="button"
 						onclick={() => switchScheduleType('minutes')}
-						class="px-2 py-1 transition-colors {scheduleType === 'minutes'
+						disabled={settingsLocked}
+						class="px-2 py-1 transition-colors disabled:opacity-50 {scheduleType === 'minutes'
 							? 'bg-violet-600 text-white'
 							: 'bg-chat-raised text-slate-500 hover:text-slate-300'}"
 					>
 						Minutes
 					</button>
 					<button
+						type="button"
 						onclick={() => switchScheduleType('daily')}
-						class="px-2 py-1 transition-colors {scheduleType === 'daily'
+						disabled={settingsLocked}
+						class="px-2 py-1 transition-colors disabled:opacity-50 {scheduleType === 'daily'
 							? 'bg-violet-600 text-white'
 							: 'bg-chat-raised text-slate-500 hover:text-slate-300'}"
 					>
 						Daily
 					</button>
 					<button
+						type="button"
 						onclick={() => switchScheduleType('days')}
-						class="px-2 py-1 transition-colors {scheduleType === 'days'
+						disabled={settingsLocked}
+						class="px-2 py-1 transition-colors disabled:opacity-50 {scheduleType === 'days'
 							? 'bg-violet-600 text-white'
 							: 'bg-chat-raised text-slate-500 hover:text-slate-300'}"
 					>
@@ -247,7 +269,8 @@
 					min={30}
 					max={1440}
 					step={10}
-					class="timer-slider w-full accent-violet-600"
+					disabled={settingsLocked}
+					class="timer-slider w-full accent-violet-600 disabled:opacity-60"
 				/>
 				<div class="mt-1 flex justify-between text-[10px] text-slate-600">
 					<span>30m</span>
@@ -262,7 +285,8 @@
 						id="schedule-time-daily"
 						type="time"
 						bind:value={scheduleTime}
-						class="rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
+						disabled={settingsLocked}
+						class="rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40 disabled:opacity-60"
 					/>
 				</div>
 			{:else}
@@ -274,7 +298,8 @@
 							oninput={(e) => handleDayInput((e.target as HTMLInputElement).value)}
 							min={1}
 							max={365}
-							class="w-20 rounded-xl border border-chat-border bg-chat-raised px-3 py-2 text-center text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
+							disabled={settingsLocked}
+							class="w-20 rounded-xl border border-chat-border bg-chat-raised px-3 py-2 text-center text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40 disabled:opacity-60"
 						/>
 						<span class="text-xs text-slate-500">day(s)</span>
 					</div>
@@ -284,7 +309,8 @@
 							id="schedule-time-days"
 							type="time"
 							bind:value={scheduleTime}
-							class="rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
+							disabled={settingsLocked}
+							class="rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40 disabled:opacity-60"
 						/>
 					</div>
 				</div>
@@ -301,7 +327,8 @@
 				bind:value={autoApplyText}
 				placeholder="Enter the analysis instruction..."
 				rows={3}
-				class="w-full resize-none rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-violet-500/40"
+				disabled={settingsLocked}
+				class="w-full resize-none rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-violet-500/40 disabled:opacity-60"
 			></textarea>
 		</div>
 
@@ -318,12 +345,15 @@
 							value={url}
 							oninput={(e) => updateUrl(i, (e.target as HTMLInputElement).value)}
 							placeholder="https://..."
-							class="flex-1 rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-violet-500/40"
+							disabled={settingsLocked}
+							class="flex-1 rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-600 focus:border-violet-500/40 disabled:opacity-60"
 						/>
 						{#if autoReferUrl.length > 1}
 							<button
+								type="button"
 								onclick={() => removeUrl(i)}
-								class="rounded-lg p-2 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+								disabled={settingsLocked}
+								class="rounded-lg p-2 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
 								aria-label="Remove URL"
 							>
 								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,8 +370,10 @@
 				{/each}
 			</div>
 			<button
+				type="button"
 				onclick={addUrl}
-				class="mt-2 flex items-center gap-1.5 text-xs text-violet-400 transition-colors hover:text-violet-300"
+				disabled={settingsLocked}
+				class="mt-2 flex items-center gap-1.5 text-xs text-violet-400 transition-colors hover:text-violet-300 disabled:opacity-50"
 			>
 				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
@@ -374,8 +406,10 @@
 					</div>
 				</div>
 				<button
+					type="button"
 					onclick={() => (enableWebSearch = !enableWebSearch)}
-					class="relative h-6 w-11 rounded-full transition-colors {enableWebSearch ? 'bg-teal-500' : 'bg-slate-700'}"
+					disabled={settingsLocked}
+					class="relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 {enableWebSearch ? 'bg-teal-500' : 'bg-slate-700'}"
 					aria-label="Toggle web search"
 				>
 					<span
@@ -408,8 +442,10 @@
 					</div>
 				</div>
 				<button
+					type="button"
 					onclick={() => (telegramEnabled = !telegramEnabled)}
-					class="relative h-6 w-11 rounded-full transition-colors {telegramEnabled ? 'bg-sky-500' : 'bg-slate-700'}"
+					disabled={settingsLocked}
+					class="relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 {telegramEnabled ? 'bg-sky-500' : 'bg-slate-700'}"
 					aria-label="Toggle Telegram"
 				>
 					<span
@@ -424,7 +460,8 @@
 						<select
 							id="telegram-bot-select"
 							bind:value={telegramBotId}
-							class="mt-1 w-full rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-sky-500/40"
+							disabled={settingsLocked}
+							class="mt-1 w-full rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-sky-500/40 disabled:opacity-60"
 						>
 							<option value="">선택하세요</option>
 							{#each telegramConfigsStore.bots as bot (bot.id)}
@@ -438,7 +475,8 @@
 							<select
 								id="telegram-chat-select"
 								bind:value={telegramChatId}
-								class="flex-1 min-w-[180px] rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-sky-500/40"
+								disabled={settingsLocked}
+								class="flex-1 min-w-[180px] rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-sky-500/40 disabled:opacity-60"
 							>
 								<option value="">선택하세요</option>
 								{#each telegramConfigsStore.chats as chat (chat.id)}
@@ -471,24 +509,26 @@
 		</div>
 	</div>
 
-	<!-- Actions bar -->
+	<!-- Actions bar (Run Now / Schedule / Delete는 잠금 시에도 사용 가능) -->
 	<div
 		class="flex flex-wrap items-center gap-2 border-t border-chat-border bg-chat-surface/50 px-5 py-3"
 	>
 		<button
 			onclick={handleSave}
-			class="rounded-xl bg-violet-600 px-4 py-2 text-xs font-medium text-white transition-all hover:bg-violet-500 active:scale-95"
+			disabled={settingsLocked}
+			class="rounded-xl bg-violet-600 px-4 py-2 text-xs font-medium text-white transition-all hover:bg-violet-500 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
 		>
 			{isNew ? 'Create Bundle' : 'Save Changes'}
 		</button>
 
 		{#if !isNew && bundle}
 			<button
-				onclick={handleRunNow}
-				disabled={bundle.isExecuting}
-				class="rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-2 text-xs font-medium text-teal-400 transition-all hover:bg-teal-500/20 disabled:opacity-50"
+				onclick={bundle.isExecuting ? () => autoStore.abortExecute(bundle.id) : handleRunNow}
+				class="rounded-xl border px-4 py-2 text-xs font-medium transition-all {bundle.isExecuting
+					? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+					: 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'}"
 			>
-				{bundle.isExecuting ? 'Running...' : 'Run Now'}
+				{bundle.isExecuting ? 'Stop Run' : 'Run Now'}
 			</button>
 
 			<button

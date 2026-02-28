@@ -1,0 +1,55 @@
+---
+description: Svelte 5 runes and project code style
+globs: "**/*.svelte,**/*.svelte.ts"
+alwaysApply: false
+---
+
+# Svelte 5 & Project Style
+
+## 스토어 (Stores)
+
+- **형식**: 클래스 + Svelte 5 runes, 단일 인스턴스 export.
+- **파일**: `src/lib/stores/*.svelte.ts`.
+- **반응형 상태**: `$state()` 로 선언. Svelte store API (`writable`/`readable`) 사용하지 않음.
+- **파생 값**: 클래스 내부에서는 **getter** 로 노출 (예: `get selectedBundle()`, `get activeConversation()`). 컴포넌트에서만 쓰는 파생은 컴포넌트 쪽 `$derived()` 사용 가능.
+
+```typescript
+// ✅ 스토어 예시
+class AppStore {
+  mode = $state<'chat' | 'auto'>('chat');
+}
+export const appStore = new AppStore();
+```
+
+## 컴포넌트 (.svelte)
+
+- **props**: `$props()` 사용. `export let` 은 신규 코드에서 사용하지 않음.
+- **로컬 상태**: `$state()`.
+- **파생**: `$derived()` (다른 state/props에 의존하는 읽기 전용 값).
+- **부수 효과**: `$effect()` (저장소 동기화, 구독 등). 번들 전환 시에만 폼 동기화하는 패턴은 `$effect` + `previousId` 로 구분.
+
+```svelte
+<!-- ✅ props / state / derived -->
+<script lang="ts">
+  let { bundle = null, isNew = false } = $props();
+  let title = $state('');
+  const settingsLocked = $derived(bundle ? bundle.isExecuting || bundle.isActive : false);
+</script>
+```
+
+## 네이밍
+
+- **파일**: kebab-case (예: `BundleEditor.svelte`, `telegramConfigs.svelte.ts`).
+- **컴포넌트**: PascalCase.
+- **변수/함수/타입**: camelCase (타입/인터페이스는 PascalCase).
+
+## API
+
+- 요청/응답은 JSON.
+- Run Now 취소: `POST /api/auto/execute/cancel` body에 `bundleId`.
+- 스케줄: body에 `scheduleType`, `scheduleTime`, `scheduleDays` 등 타입에 맞게 전달.
+
+## 금지/비권장
+
+- 스토어에서 `writable`/`readable`/`$store` 사용하지 않음.
+- 컴포넌트 신규 코드에서 `export let` + `$:` 반응성 대신 runes 사용.

@@ -3,7 +3,7 @@ const MAX_CONTENT_LENGTH = 80000;
 const USER_AGENT =
 	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-export async function fetchUrlContent(url: string): Promise<string> {
+export async function fetchUrlContent(url: string, signal?: AbortSignal): Promise<string> {
 	console.log('[Scraper] Fetching:', url);
 
 	const response = await fetch(url, {
@@ -12,7 +12,7 @@ export async function fetchUrlContent(url: string): Promise<string> {
 			Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 			'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
 		},
-		signal: AbortSignal.timeout(20000)
+		signal: signal ?? AbortSignal.timeout(20000)
 	});
 
 	if (!response.ok) {
@@ -288,11 +288,12 @@ function cleanExtractedText(text: string): string {
 }
 
 export async function fetchMultipleUrls(
-	urls: string[]
+	urls: string[],
+	signal?: AbortSignal
 ): Promise<Array<{ url: string; content: string; error?: string }>> {
 	const results = await Promise.allSettled(
 		urls.map(async (url) => {
-			const content = await fetchUrlContent(url);
+			const content = await fetchUrlContent(url, signal);
 			return { url, content };
 		})
 	);

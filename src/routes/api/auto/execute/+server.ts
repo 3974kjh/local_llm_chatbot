@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { executeBundle } from '$lib/server/scheduler';
+import { executeBundle, registerRunAbort, unregisterRunAbort } from '$lib/server/scheduler';
 
 export const POST: RequestHandler = async ({ request }) => {
 	let body: Record<string, unknown>;
@@ -11,6 +11,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	const {
+		bundleId,
 		title,
 		autoApplyText,
 		autoReferUrl,
@@ -20,22 +21,37 @@ export const POST: RequestHandler = async ({ request }) => {
 		telegramChatId: bodyChatId
 	} = body;
 
-	// 데이터 없으면 텔레그램 전송 안 함 (.env 사용 안 함)
 	const telegramBotToken = String(bodyToken ?? '').trim();
 	const telegramChatId = String(bodyChatId ?? '').trim();
 
-	if (!title || !autoApplyText || !autoReferUrl?.length) {
-		return json({ success: false, error: 'Missing required fields' }, { status: 400 });
+	if (!title || !autoApplyText) {
+		return json({ success: false, error: 'Missing required fields: title, autoApplyText' }, { status: 400 });
+	}
+	const urls = Array.isArray(autoReferUrl) ? (autoReferUrl as string[]).filter((u) => typeof u === 'string' && u.trim()) : [];
+	const enableSearch = !!enableWebSearch;
+	if (urls.length === 0 && !enableSearch) {
+		return json(
+			{ success: false, error: 'Add at least one URL or enable Web Search' },
+			{ status: 400 }
+		);
 	}
 
-	const result = await executeBundle(
-		title as string,
-		autoApplyText as string,
-		autoReferUrl as string[],
-		!!enableWebSearch,
-		!!telegramEnabled,
-		telegramBotToken,
-		telegramChatId
-	);
-	return json(result);
+	const id = typeof bundleId === 'string' && bundleId.trim() ? bundleId.trim() : null;
+	const signal = id ? registerRunAbort(id) : request.signal;
+
+	try {
+		const result = await executeBundle(
+			title as string,
+			autoApplyText as string,
+			urls,
+			enableSearch,
+			!!telegramEnabled,
+			telegramBotToken,
+			telegramChatId,
+			signal
+		);
+		return json(result);
+	} finally {
+		if (id) unregisterRunAbort(id);
+	}
 };

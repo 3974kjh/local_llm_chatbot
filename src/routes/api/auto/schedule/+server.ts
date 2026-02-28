@@ -21,8 +21,16 @@ export const POST: RequestHandler = async ({ request }) => {
 			telegramChatId
 		} = body;
 
-		if (!id || !title || !autoApplyText || !autoReferUrl?.length) {
-			return json({ success: false, error: 'Missing required fields' }, { status: 400 });
+		if (!id || !title || !autoApplyText) {
+			return json({ success: false, error: 'Missing required fields: id, title, autoApplyText' }, { status: 400 });
+		}
+		const urls = Array.isArray(autoReferUrl) ? (autoReferUrl as string[]).filter((u) => typeof u === 'string' && u.trim()) : [];
+		const enableSearch = !!enableWebSearch;
+		if (urls.length === 0 && !enableSearch) {
+			return json(
+				{ success: false, error: 'Add at least one URL or enable Web Search' },
+				{ status: 400 }
+			);
 		}
 		const st = scheduleType ?? 'minutes';
 		if (st === 'minutes' && (autoTimeSetting == null || autoTimeSetting < 1)) {
@@ -34,8 +42,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			title,
 			Number(autoTimeSetting) || 60,
 			autoApplyText,
-			autoReferUrl,
-			!!enableWebSearch,
+			urls,
+			enableSearch,
 			!!telegramEnabled,
 			(telegramBotToken ?? '').trim(),
 			(telegramChatId ?? '').trim(),

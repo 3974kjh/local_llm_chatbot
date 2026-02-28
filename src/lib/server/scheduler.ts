@@ -96,6 +96,29 @@ function stopTimeBasedTickIfUnused(): void {
 
 console.log('[Scheduler] Module loaded/reloaded - activeTasks is fresh (empty)');
 
+/** Run Now 취소용: bundleId -> AbortController (execute API에서만 사용) */
+const runAbortControllers = new Map<string, AbortController>();
+
+export function registerRunAbort(bundleId: string): AbortSignal {
+	const existing = runAbortControllers.get(bundleId);
+	if (existing) existing.abort();
+	const controller = new AbortController();
+	runAbortControllers.set(bundleId, controller);
+	return controller.signal;
+}
+
+export function abortRun(bundleId: string): void {
+	const controller = runAbortControllers.get(bundleId);
+	if (controller) {
+		controller.abort();
+		console.log(`[Scheduler] Run aborted for bundleId=${bundleId}`);
+	}
+}
+
+export function unregisterRunAbort(bundleId: string): void {
+	runAbortControllers.delete(bundleId);
+}
+
 export async function executeBundle(
 	title: string,
 	autoApplyText: string,
@@ -103,14 +126,18 @@ export async function executeBundle(
 	enableWebSearch = false,
 	telegramEnabled = false,
 	telegramBotToken = '',
-	telegramChatId = ''
+	telegramChatId = '',
+	signal?: AbortSignal
 ): Promise<{ researchResultText: string; success: boolean; error?: string }> {
 	try {
+		if (signal?.aborted) {
+			return { researchResultText: '', success: false, error: 'Cancelled' };
+		}
 		console.log(
 			`[Scheduler] Executing bundle "${title}" with ${autoReferUrl.length} URLs, webSearch=${enableWebSearch}, telegramEnabled=${telegramEnabled}, hasToken=${!!(telegramBotToken && telegramBotToken.trim())}, hasChatId=${!!(telegramChatId && telegramChatId.trim())}`
 		);
 
-		const urlResults = await fetchMultipleUrls(autoReferUrl);
+		const urlResults = await fetchMultipleUrls(autoReferUrl, signal);
 
 		const successfulContents = urlResults.filter((r) => r.content && !r.error);
 		const failedUrls = urlResults.filter((r) => r.error);
@@ -130,7 +157,7 @@ export async function executeBundle(
 			const searchQuery = `${autoApplyText} ${today}`;
 			console.log(`[Scheduler] Web searching: "${searchQuery}"`);
 
-			const searchResults = await searchWeb(searchQuery);
+			const searchResults = await searchWeb(searchQuery, signal);
 			console.log(`[Scheduler] Web search returned ${searchResults.length} results`);
 
 			if (searchResults.length > 0) {
@@ -145,7 +172,7 @@ export async function executeBundle(
 					const webDetailResults = await Promise.allSettled(
 						newUrls.map(async (url) => {
 							try {
-								const content = await fetchUrlContent(url);
+								const content = await fetchUrlContent(url, signal);
 								return { url, content };
 							} catch {
 								return { url, content: '' };
@@ -202,32 +229,22 @@ export async function executeBundle(
 			console.log(`[Scheduler] URL content preview [${c.url}]: ${c.content.slice(0, 300).replace(/\n/g, ' | ')}`);
 		}
 
-		const systemPrompt = `You are a text extraction and summarization tool. You have NO knowledge of your own. You can ONLY read and summarize the text that is provided to you below.
+		const now = new Date();
+		const todayStr = now.toISOString().split('T')[0];
+		const todayLocal = now.toLocaleString('ko-KR', { dateStyle: 'long', timeStyle: 'short' });
 
-=== CRITICAL RULES ===
-1. You are BLIND to the world. You know NOTHING except the text provided below between the ========== markers.
-2. Every single sentence you write MUST be directly based on text you can find below.
-3. If information is NOT in the provided text, it DOES NOT EXIST for you. Do not guess, assume, or fill in gaps.
-4. When you mention a headline, article title, or fact, it must appear VERBATIM or nearly verbatim in the provided text.
-5. If the text is mostly noise (UI elements, navigation) and has little real content, say: "제공된 페이지에서 의미있는 기사 콘텐츠를 충분히 추출하지 못했습니다."
-6. NEVER use your training data to answer. ONLY use the provided text.
+		const systemPrompt = `You are an assistant that answers the user's request using ONLY the context provided below (attached URLs and/or web search results).
 
-HOW TO RESPOND:
-- Read through ALL the provided text carefully.
-- Identify actual article headlines (they are usually longer phrases describing news events).
-- Ignore any UI text like: navigation menus, button labels, "더보기", "닫기", algorithm descriptions, copyright notices, "관련뉴스", etc.
-- For each real article you find, write: the headline as it appears, then a brief summary based on the description text that follows it.
-- Group related articles together if the user asks for grouping.
-${hasWebSearch ? '\nADDITIONAL WEB SEARCH DATA is also provided. You may use it to supplement, but clearly label which information comes from attached URLs vs web search.' : ''}
+=== RULES ===
+1. Use ONLY the text between the ========== markers. Do not invent or guess information.
+2. Match the user's intent:
+   - If they ask for simple facts (weather, date, time, one-line answer): give a SHORT, direct answer. No long summaries.
+   - If they ask to summarize or analyze articles/URLs: extract headlines and summarize from the context. Quote key phrases from the text.
+   - If they ask for a list or comparison: respond in a clear list format.
+3. "Today" / "오늘" = the execution date/time stated in the user message. Use it for weather, date-related answers.
+4. Output: plain text, no markdown # or **. Use line breaks and "- " for lists. Match the user's language (Korean or English).`;
 
-OUTPUT:
-- Match the language of the user's prompt (Korean = Korean response).
-- Plain text only (no markdown # or ** symbols).
-- Use line breaks between sections.
-- Use "- " for bullet points.
-- Today's date: ${new Date().toISOString().split('T')[0]}.`;
-
-		let userPrompt = `[사용자 요청]\n${autoApplyText}\n\n아래는 웹페이지에서 추출한 텍스트입니다. 이 텍스트 안에 있는 내용만 사용하여 위 요청에 답하세요.\n`;
+		let userPrompt = `[실행 기준 일시 (오늘)] ${todayStr} (${todayLocal})\n\n[사용자 요청]\n${autoApplyText}\n\n아래 제공된 맥락(첨부 URL·웹 검색 결과)만 사용해서 위 요청에 답하세요. 요청이 날씨·날짜·단순 질문이면 짧고 심플하게, 기사/URL 정리 요청이면 요약·인용으로 답하세요.\n`;
 
 		if (hasUrlContent) {
 			userPrompt += `\n${urlContextSection}\n`;
@@ -241,7 +258,7 @@ OUTPUT:
 			}
 		}
 
-		userPrompt += `\n\n[최종 지시]\n위 ========== 마커 사이의 텍스트에서 찾을 수 있는 실제 기사 제목과 내용만 인용하여 정리하세요. 위 텍스트에 없는 내용은 절대 작성하지 마세요. 기사 제목은 원문 그대로 인용하세요.`;
+		userPrompt += `\n\n[지시]\n위 맥락만 사용해 사용자 요청에 맞게 답하세요. 단순 질문이면 한두 문장으로, 정리·요약 요청이면 맥락에서 인용해 정리하세요.`;
 
 		const ollamaResponse = await axios.post(
 			`${OLLAMA_URL}/api/chat`,
@@ -257,11 +274,16 @@ OUTPUT:
 					temperature: 0.1
 				}
 			},
-			{ timeout: 180000 }
+			{ timeout: 180000, ...(signal && { signal }) }
 		);
 
 		const researchResultText = ollamaResponse.data.message?.content || '';
 		console.log(`[Scheduler] Ollama returned ${researchResultText.length} chars`);
+
+		if (signal?.aborted) {
+			console.log(`[Scheduler] Bundle "${title}" aborted before send - skipping Kakao/Telegram`);
+			return { researchResultText: '', success: false, error: 'Cancelled' };
+		}
 
 		let kakaoSent = false;
 		let kakaoError: string | undefined;
@@ -283,6 +305,11 @@ OUTPUT:
 
 		let telegramSent = false;
 		let telegramError: string | undefined;
+
+		if (signal?.aborted) {
+			console.log(`[Scheduler] Bundle "${title}" aborted before Telegram - skipping send`);
+			return { researchResultText: '', success: false, error: 'Cancelled' };
+		}
 
 		console.log('[Scheduler] Telegram 조건:', {
 			telegramEnabled,
@@ -328,8 +355,10 @@ OUTPUT:
 			telegramError
 		} as { researchResultText: string; success: boolean; error?: string };
 	} catch (error: unknown) {
-		const msg = error instanceof Error ? error.message : 'Unknown error';
-		console.error(`[Scheduler] Bundle "${title}" execution failed:`, msg);
+		const isAbort = error instanceof Error && (error.name === 'AbortError' || /abort|cancel/i.test(error.message));
+		const msg = isAbort ? 'Cancelled' : (error instanceof Error ? error.message : 'Unknown error');
+		if (isAbort) console.log(`[Scheduler] Bundle "${title}" execution cancelled by user`);
+		else console.error(`[Scheduler] Bundle "${title}" execution failed:`, msg);
 		return { researchResultText: '', success: false, error: msg };
 	}
 }

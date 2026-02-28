@@ -20,6 +20,7 @@ class AutoStore {
 	telegramTestLoading = $state(false);
 
 	private pollingTimer: ReturnType<typeof setInterval> | null = null;
+	private executeAbortRef: { bundleId: string; controller: AbortController } | null = null;
 
 	constructor() {
 		if (browser) {
@@ -143,6 +144,17 @@ class AutoStore {
 
 	// --- Execution ---
 
+	abortExecute(bundleId: string): void {
+		fetch('/api/auto/execute/cancel', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ bundleId })
+		}).catch(() => {});
+		if (this.executeAbortRef?.bundleId === bundleId) {
+			this.executeAbortRef.controller.abort();
+		}
+	}
+
 	async executeBundle(
 		id: string,
 		telegramOverrides?: {
@@ -154,6 +166,8 @@ class AutoStore {
 		const bundle = this.bundles.find((b) => b.id === id);
 		if (!bundle || bundle.isExecuting) return;
 
+		const controller = new AbortController();
+		this.executeAbortRef = { bundleId: id, controller };
 		bundle.isExecuting = true;
 
 		try {
@@ -161,7 +175,6 @@ class AutoStore {
 			const chatId = telegramOverrides?.telegramChatId ?? bundle.telegramChatId;
 			const bot = botId ? telegramConfigsStore.getBotById(botId) : undefined;
 			const chat = chatId ? telegramConfigsStore.getChatById(chatId) : undefined;
-			// Run Now 시 에디터 폼 상태 반영 (저장 안 해도 토글·봇·수신처 적용)
 			const telegramEnabled =
 				telegramOverrides?.telegramEnabled !== undefined
 					? telegramOverrides.telegramEnabled
@@ -184,6 +197,7 @@ class AutoStore {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
+					bundleId: id,
 					title: bundle.title,
 					autoApplyText: bundle.autoApplyText,
 					autoReferUrl: bundle.autoReferUrl,
@@ -191,7 +205,8 @@ class AutoStore {
 					telegramEnabled,
 					telegramBotToken,
 					telegramChatId: telegramChatIdVal
-				})
+				}),
+				signal: controller.signal
 			});
 
 			const result = await response.json();
@@ -214,11 +229,13 @@ class AutoStore {
 			});
 		} catch (e) {
 			const now = new Date().toISOString();
-			const errorText = `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
+			const isAbort = e instanceof Error && (e.name === 'AbortError' || /abort|cancel/i.test(e.message));
+			const errorText = isAbort ? 'Cancelled' : `Error: ${e instanceof Error ? e.message : 'Unknown'}`;
 			bundle.researchResultText = errorText;
 			bundle.lastExecutedAt = now;
 			this.addToHistory(bundle, { executedAt: now, result: errorText, success: false });
 		} finally {
+			this.executeAbortRef = null;
 			bundle.isExecuting = false;
 			this.persist();
 		}

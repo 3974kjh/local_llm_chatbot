@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import type { Conversation, Message } from '$lib/types';
 import { streamChat } from '$lib/services/api';
 import { generateId, getCurrentDateContext } from '$lib/utils/helpers';
+import { getItem, setItem } from '$lib/db';
 
 const STORAGE_KEY = 'jukimbot-chat-conversations';
 
@@ -172,9 +173,22 @@ class ChatStore {
 		}
 	}
 
-	private loadFromStorage() {
+	private async loadFromStorage() {
+		if (!browser) return;
 		try {
-			const saved = localStorage.getItem(STORAGE_KEY);
+			let saved = await getItem(STORAGE_KEY);
+			if (saved == null || saved === '') {
+				const fromLs = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+				if (fromLs) {
+					saved = fromLs;
+					await setItem(STORAGE_KEY, fromLs);
+					try {
+						localStorage.removeItem(STORAGE_KEY);
+					} catch {
+						// ignore
+					}
+				}
+			}
 			if (saved) {
 				const parsed = JSON.parse(saved);
 				this.conversations = parsed.map((c: Record<string, unknown>) => ({
@@ -199,13 +213,10 @@ class ChatStore {
 	}
 
 	private persist() {
-		if (browser) {
-			try {
-				localStorage.setItem(STORAGE_KEY, JSON.stringify(this.conversations));
-			} catch {
-				// ignore quota exceeded
-			}
-		}
+		if (!browser) return;
+		setItem(STORAGE_KEY, JSON.stringify(this.conversations)).catch(() => {
+			// ignore quota exceeded
+		});
 	}
 }
 

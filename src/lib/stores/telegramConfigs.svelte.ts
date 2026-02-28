@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import type { TelegramBotConfig, TelegramChatConfig } from '$lib/types/auto';
 import { generateId } from '$lib/utils/helpers';
+import { getItem, setItem, removeItem } from '$lib/db';
 
 const BOTS_KEY = 'jukimbot-telegram-bots';
 const CHATS_KEY = 'jukimbot-telegram-chats';
@@ -94,11 +95,26 @@ class TelegramConfigsStore {
 		this.persistChats();
 	}
 
-	private loadFromStorage(): void {
+	private async loadFromStorage(): Promise<void> {
+		if (!browser) return;
 		try {
-			const savedBots = localStorage.getItem(BOTS_KEY);
-			const savedChats = localStorage.getItem(CHATS_KEY);
-			const oldConfigs = localStorage.getItem(OLD_CONFIGS_KEY);
+			let savedBots = await getItem(BOTS_KEY);
+			let savedChats = await getItem(CHATS_KEY);
+			let oldConfigs: string | null = null;
+			if (savedBots == null && savedChats == null && typeof localStorage !== 'undefined') {
+				savedBots = localStorage.getItem(BOTS_KEY);
+				savedChats = localStorage.getItem(CHATS_KEY);
+				oldConfigs = localStorage.getItem(OLD_CONFIGS_KEY);
+				if (savedBots) await setItem(BOTS_KEY, savedBots);
+				if (savedChats) await setItem(CHATS_KEY, savedChats);
+				try {
+					if (savedBots) localStorage.removeItem(BOTS_KEY);
+					if (savedChats) localStorage.removeItem(CHATS_KEY);
+					if (oldConfigs) localStorage.removeItem(OLD_CONFIGS_KEY);
+				} catch {
+					// ignore
+				}
+			}
 
 			if (savedBots) {
 				const parsed = JSON.parse(savedBots);
@@ -120,7 +136,7 @@ class TelegramConfigsStore {
 						}
 						this.persistBots();
 						this.persistChats();
-						localStorage.removeItem(OLD_CONFIGS_KEY);
+						removeItem(OLD_CONFIGS_KEY).catch(() => {});
 					}
 				} catch {
 					// ignore
@@ -136,23 +152,13 @@ class TelegramConfigsStore {
 	}
 
 	private persistBots(): void {
-		if (browser) {
-			try {
-				localStorage.setItem(BOTS_KEY, JSON.stringify(this.bots));
-			} catch {
-				// ignore
-			}
-		}
+		if (!browser) return;
+		setItem(BOTS_KEY, JSON.stringify(this.bots)).catch(() => {});
 	}
 
 	private persistChats(): void {
-		if (browser) {
-			try {
-				localStorage.setItem(CHATS_KEY, JSON.stringify(this.chats));
-			} catch {
-				// ignore
-			}
-		}
+		if (!browser) return;
+		setItem(CHATS_KEY, JSON.stringify(this.chats)).catch(() => {});
 	}
 }
 

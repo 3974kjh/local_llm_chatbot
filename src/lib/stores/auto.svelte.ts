@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import type { AutoBundle, BundleFormData, BundleStatus, ResultHistoryItem } from '$lib/types/auto';
 import { generateId } from '$lib/utils/helpers';
 import { telegramConfigsStore } from '$lib/stores/telegramConfigs.svelte';
+import { getItem, setItem } from '$lib/db';
 
 const STORAGE_KEY = 'jukimbot-auto-bundles';
 
@@ -406,9 +407,22 @@ class AutoStore {
 
 	// --- Persistence ---
 
-	private loadFromStorage() {
+	private async loadFromStorage() {
+		if (!browser) return;
 		try {
-			const saved = localStorage.getItem(STORAGE_KEY);
+			let saved = await getItem(STORAGE_KEY);
+			if (saved == null || saved === '') {
+				const fromLs = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+				if (fromLs) {
+					saved = fromLs;
+					await setItem(STORAGE_KEY, fromLs);
+					try {
+						localStorage.removeItem(STORAGE_KEY);
+					} catch {
+						// ignore
+					}
+				}
+			}
 			if (saved) {
 				const parsed = JSON.parse(saved);
 				this.bundles = parsed.map((b: Record<string, unknown>) => ({
@@ -431,13 +445,10 @@ class AutoStore {
 	}
 
 	private persist() {
-		if (browser) {
-			try {
-				localStorage.setItem(STORAGE_KEY, JSON.stringify(this.bundles));
-			} catch {
-				// ignore
-			}
-		}
+		if (!browser) return;
+		setItem(STORAGE_KEY, JSON.stringify(this.bundles)).catch(() => {
+			// ignore
+		});
 	}
 }
 

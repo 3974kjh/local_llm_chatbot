@@ -59,6 +59,9 @@ class AutoStore {
 			id,
 			title: data.title.trim(),
 			autoTimeSetting: data.autoTimeSetting,
+			scheduleType: data.scheduleType ?? 'minutes',
+			scheduleTime: data.scheduleTime ?? '09:00',
+			scheduleDays: Math.max(1, Math.min(365, data.scheduleDays ?? 1)),
 			autoApplyText: data.autoApplyText,
 			autoReferUrl: data.autoReferUrl.filter((u) => u.trim()),
 			enableWebSearch: data.enableWebSearch,
@@ -90,6 +93,9 @@ class AutoStore {
 
 		bundle.title = data.title.trim();
 		bundle.autoTimeSetting = data.autoTimeSetting;
+		bundle.scheduleType = data.scheduleType ?? 'minutes';
+		bundle.scheduleTime = data.scheduleTime ?? '09:00';
+		bundle.scheduleDays = Math.max(1, Math.min(365, data.scheduleDays ?? 1));
 		bundle.autoApplyText = data.autoApplyText;
 		bundle.autoReferUrl = data.autoReferUrl.filter((u) => u.trim());
 		bundle.enableWebSearch = data.enableWebSearch;
@@ -233,6 +239,9 @@ class AutoStore {
 					id: bundle.id,
 					title: bundle.title,
 					autoTimeSetting: bundle.autoTimeSetting,
+					scheduleType: bundle.scheduleType ?? 'minutes',
+					scheduleTime: bundle.scheduleTime ?? '09:00',
+					scheduleDays: bundle.scheduleDays ?? 1,
 					autoApplyText: bundle.autoApplyText,
 					autoReferUrl: bundle.autoReferUrl,
 					enableWebSearch: bundle.enableWebSearch,
@@ -427,6 +436,9 @@ class AutoStore {
 				const parsed = JSON.parse(saved);
 				this.bundles = parsed.map((b: Record<string, unknown>) => ({
 					...b,
+					scheduleType: b.scheduleType ?? 'minutes',
+					scheduleTime: b.scheduleTime ?? '09:00',
+					scheduleDays: Math.max(1, Math.min(365, Number(b.scheduleDays) || 1)),
 					enableWebSearch: b.enableWebSearch ?? false,
 					telegramEnabled: b.telegramEnabled ?? false,
 					telegramBotId: String(b.telegramBotId ?? '').trim(),

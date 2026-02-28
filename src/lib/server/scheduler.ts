@@ -7,6 +7,8 @@ import { sendMessageChunked as sendTelegramChunked } from './telegram';
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
 
+type ScheduleType = 'minutes' | 'daily' | 'days';
+
 interface ScheduledTask {
 	id: string;
 	title: string;
@@ -17,7 +19,12 @@ interface ScheduledTask {
 	telegramEnabled: boolean;
 	telegramBotToken: string;
 	telegramChatId: string;
+	scheduleType: ScheduleType;
+	scheduleTime: string;
+	scheduleDays: number;
 	timer: ReturnType<typeof setInterval>;
+	/** Next run timestamp (for daily/days). */
+	nextRunAt: number | null;
 	lastResult: string | null;
 	lastExecutedAt: string | null;
 	isRunning: boolean;
@@ -25,6 +32,67 @@ interface ScheduledTask {
 }
 
 const activeTasks = new Map<string, ScheduledTask>();
+
+const TICK_MS = 60 * 1000;
+
+/** Next run at scheduleTime today or tomorrow. */
+function getNextRunDaily(scheduleTime: string): number {
+	const [h, m] = scheduleTime.split(':').map(Number);
+	const next = new Date();
+	next.setHours(typeof h === 'number' ? h : 9, typeof m === 'number' ? m : 0, 0, 0);
+	if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
+	return next.getTime();
+}
+
+/** Next run: lastRun + scheduleDays days at scheduleTime. */
+function getNextRunDays(scheduleTime: string, scheduleDays: number, lastRunAt: number): number {
+	const [h, m] = scheduleTime.split(':').map(Number);
+	const next = new Date(lastRunAt);
+	next.setDate(next.getDate() + scheduleDays);
+	next.setHours(typeof h === 'number' ? h : 9, typeof m === 'number' ? m : 0, 0, 0);
+	return next.getTime();
+}
+
+function runTimeBasedTick(): void {
+	const now = Date.now();
+	for (const [, task] of activeTasks) {
+		if (task.scheduleType !== 'daily' && task.scheduleType !== 'days') continue;
+		if (task.nextRunAt == null || task.isRunning) continue;
+		if (now < task.nextRunAt) continue;
+		task.nextRunAt = null;
+		runTask(task, 'scheduled-time').then(() => {
+			if (task.scheduleType === 'daily') {
+				task.nextRunAt = getNextRunDaily(task.scheduleTime);
+			} else {
+				task.nextRunAt = getNextRunDays(
+					task.scheduleTime,
+					task.scheduleDays,
+					task.lastExecutedAt ? new Date(task.lastExecutedAt).getTime() : now
+				);
+			}
+			console.log(`[Scheduler] Next run for "${task.title}" at ${new Date(task.nextRunAt).toISOString()}`);
+		});
+	}
+}
+
+let timeBasedTickTimer: ReturnType<typeof setInterval> | null = null;
+
+function ensureTimeBasedTick(): void {
+	if (timeBasedTickTimer != null) return;
+	timeBasedTickTimer = setInterval(runTimeBasedTick, TICK_MS);
+	console.log('[Scheduler] Time-based tick started (every 60s)');
+}
+
+function stopTimeBasedTickIfUnused(): void {
+	for (const task of activeTasks.values()) {
+		if (task.scheduleType === 'daily' || task.scheduleType === 'days') return;
+	}
+	if (timeBasedTickTimer != null) {
+		clearInterval(timeBasedTickTimer);
+		timeBasedTickTimer = null;
+		console.log('[Scheduler] Time-based tick stopped');
+	}
+}
 
 console.log('[Scheduler] Module loaded/reloaded - activeTasks is fresh (empty)');
 
@@ -317,11 +385,12 @@ export function startSchedule(
 	enableWebSearch = false,
 	telegramEnabled = false,
 	telegramBotToken = '',
-	telegramChatId = ''
+	telegramChatId = '',
+	scheduleType: ScheduleType = 'minutes',
+	scheduleTime = '09:00',
+	scheduleDays = 1
 ): void {
 	stopSchedule(id);
-
-	const intervalMs = autoTimeSetting * 60 * 1000;
 
 	const task: ScheduledTask = {
 		id,
@@ -333,34 +402,40 @@ export function startSchedule(
 		telegramEnabled,
 		telegramBotToken: (telegramBotToken || '').trim(),
 		telegramChatId: (telegramChatId || '').trim(),
+		scheduleType,
+		scheduleTime,
+		scheduleDays,
 		timer: null as unknown as ReturnType<typeof setInterval>,
+		nextRunAt: null,
 		lastResult: null,
 		lastExecutedAt: null,
 		isRunning: false,
 		executionCount: 0
 	};
 
-	console.log(
-		`[Scheduler] Scheduling "${title}" every ${autoTimeSetting}min (${intervalMs}ms), webSearch=${enableWebSearch}`
-	);
-
-	task.timer = setInterval(() => {
-		if (!activeTasks.has(id)) {
-			console.warn(`[Scheduler] Orphaned timer for "${title}" (id=${id}) - clearing`);
-			clearInterval(task.timer);
-			return;
-		}
-
+	if (scheduleType === 'minutes') {
+		const intervalMs = autoTimeSetting * 60 * 1000;
 		console.log(
-			`[Scheduler] Interval fired for "${title}" - isRunning=${task.isRunning}`
+			`[Scheduler] Scheduling "${title}" every ${autoTimeSetting}min (${intervalMs}ms), webSearch=${enableWebSearch}`
 		);
-
-		runTask(task, 'interval');
-	}, intervalMs);
-
-	activeTasks.set(id, task);
-
-	runTask(task, 'immediate');
+		task.timer = setInterval(() => {
+			if (!activeTasks.has(id)) {
+				console.warn(`[Scheduler] Orphaned timer for "${title}" (id=${id}) - clearing`);
+				clearInterval(task.timer);
+				return;
+			}
+			runTask(task, 'interval');
+		}, intervalMs);
+		activeTasks.set(id, task);
+		runTask(task, 'immediate');
+	} else {
+		task.nextRunAt = getNextRunDaily(scheduleTime);
+		console.log(
+			`[Scheduler] Scheduling "${title}" ${scheduleType === 'daily' ? 'daily' : `every ${scheduleDays} day(s)`} at ${scheduleTime}, next at ${new Date(task.nextRunAt).toISOString()}`
+		);
+		activeTasks.set(id, task);
+		ensureTimeBasedTick();
+	}
 }
 
 export function stopSchedule(id: string): void {
@@ -369,8 +444,9 @@ export function stopSchedule(id: string): void {
 		console.log(
 			`[Scheduler] Stopping "${task.title}" (id=${id}) - ran ${task.executionCount} times`
 		);
-		clearInterval(task.timer);
+		if (task.timer) clearInterval(task.timer);
 		activeTasks.delete(id);
+		stopTimeBasedTickIfUnused();
 		console.log(`[Scheduler] Confirmed removed id=${id}. Active tasks remaining: ${activeTasks.size}`);
 	} else {
 		console.log(`[Scheduler] stopSchedule called for id=${id} but no active task found. Active tasks: ${activeTasks.size}`);
@@ -381,9 +457,13 @@ export function stopAllSchedules(): void {
 	console.log(`[Scheduler] Stopping ALL schedules. Count: ${activeTasks.size}`);
 	for (const [id, task] of activeTasks) {
 		console.log(`[Scheduler] Force stopping "${task.title}" (id=${id})`);
-		clearInterval(task.timer);
+		if (task.timer) clearInterval(task.timer);
 	}
 	activeTasks.clear();
+	if (timeBasedTickTimer != null) {
+		clearInterval(timeBasedTickTimer);
+		timeBasedTickTimer = null;
+	}
 	console.log(`[Scheduler] All schedules stopped.`);
 }
 

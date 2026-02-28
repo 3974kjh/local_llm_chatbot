@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AutoBundle, BundleFormData } from '$lib/types/auto';
+	import type { AutoBundle, BundleFormData, ScheduleType } from '$lib/types/auto';
 	import { autoStore } from '$lib/stores/auto.svelte';
 	import { telegramConfigsStore } from '$lib/stores/telegramConfigs.svelte';
 	import MarkdownRenderer from '../MarkdownRenderer.svelte';
@@ -23,13 +23,19 @@
 	let titleError = $state<string | null>(null);
 	let expandedHistoryIndex = $state(-1);
 
-	let intervalMode = $state<'minutes' | 'days'>('minutes');
+	let scheduleType = $state<ScheduleType>('minutes');
+	let scheduleTime = $state('09:00');
+	let scheduleDays = $state(1);
 	let dayInput = $state(1);
 
 	$effect(() => {
 		if (bundle) {
 			title = bundle.title;
 			autoTimeSetting = bundle.autoTimeSetting;
+			scheduleType = (bundle.scheduleType ?? 'minutes') as ScheduleType;
+			scheduleTime = bundle.scheduleTime ?? '09:00';
+			scheduleDays = Math.max(1, Math.min(365, bundle.scheduleDays ?? 1));
+			dayInput = scheduleDays;
 			autoApplyText = bundle.autoApplyText;
 			autoReferUrl = bundle.autoReferUrl.length ? [...bundle.autoReferUrl] : [''];
 			enableWebSearch = bundle.enableWebSearch ?? false;
@@ -37,15 +43,18 @@
 			telegramBotId = (bundle.telegramBotId ?? '').trim();
 			telegramChatId = (bundle.telegramChatId ?? '').trim();
 			expandedHistoryIndex = -1;
-			if (bundle.autoTimeSetting >= 1440 && bundle.autoTimeSetting % 1440 === 0) {
-				intervalMode = 'days';
+			if (scheduleType === 'minutes' && bundle.autoTimeSetting >= 1440 && bundle.autoTimeSetting % 1440 === 0) {
+				scheduleType = 'days';
 				dayInput = bundle.autoTimeSetting / 1440;
-			} else {
-				intervalMode = 'minutes';
+				scheduleDays = dayInput;
 			}
 		} else if (isNew) {
 			title = '';
 			autoTimeSetting = 60;
+			scheduleType = 'minutes';
+			scheduleTime = '09:00';
+			scheduleDays = 1;
+			dayInput = 1;
 			autoApplyText = '';
 			autoReferUrl = [''];
 			enableWebSearch = false;
@@ -53,16 +62,17 @@
 			telegramBotId = '';
 			telegramChatId = '';
 			expandedHistoryIndex = -1;
-			intervalMode = 'minutes';
-			dayInput = 1;
 		}
 	});
 
-	function switchIntervalMode(mode: 'minutes' | 'days') {
-		intervalMode = mode;
+	function switchScheduleType(mode: ScheduleType) {
+		scheduleType = mode;
 		if (mode === 'days') {
-			dayInput = Math.max(1, Math.round(autoTimeSetting / 1440)) || 1;
-			autoTimeSetting = dayInput * 1440;
+			dayInput = Math.max(1, dayInput);
+			scheduleDays = dayInput;
+			autoTimeSetting = scheduleDays * 1440;
+		} else if (mode === 'daily') {
+			autoTimeSetting = 1440;
 		} else {
 			autoTimeSetting = Math.min(1440, Math.max(30, autoTimeSetting));
 		}
@@ -72,8 +82,17 @@
 		const num = parseInt(value, 10);
 		if (!isNaN(num) && num >= 1 && num <= 365) {
 			dayInput = num;
-			autoTimeSetting = num * 1440;
+			scheduleDays = num;
+			if (scheduleType === 'days') autoTimeSetting = num * 1440;
 		}
+	}
+
+	function normalizeScheduleTime(val: string): string {
+		const match = val.match(/^(\d{1,2}):(\d{2})$/);
+		if (!match) return scheduleTime;
+		const h = Math.min(23, Math.max(0, parseInt(match[1], 10)));
+		const m = Math.min(59, Math.max(0, parseInt(match[2], 10)));
+		return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 	}
 
 	function addUrl() {
@@ -112,9 +131,13 @@
 		}
 
 		titleError = null;
+		const time = normalizeScheduleTime(scheduleTime);
 		const data: BundleFormData = {
 			title,
-			autoTimeSetting,
+			autoTimeSetting: scheduleType === 'minutes' ? autoTimeSetting : scheduleType === 'daily' ? 1440 : scheduleDays * 1440,
+			scheduleType,
+			scheduleTime: time,
+			scheduleDays: Math.max(1, Math.min(365, scheduleDays)),
 			autoApplyText,
 			autoReferUrl: autoReferUrl.filter((u) => u.trim()),
 			enableWebSearch,
@@ -176,33 +199,47 @@
 			{/if}
 		</div>
 
-		<!-- Timer -->
+		<!-- Schedule -->
 		<div>
 			<div class="mb-2 flex items-center justify-between">
 				<p class="text-xs font-medium text-slate-400">
-					Interval: <span class="text-violet-400">{formatTimer(autoTimeSetting)}</span>
+					{#if scheduleType === 'minutes'}
+						Interval: <span class="text-violet-400">{formatTimer(autoTimeSetting)}</span>
+					{:else if scheduleType === 'daily'}
+						<span class="text-violet-400">Daily at {scheduleTime}</span>
+					{:else}
+						<span class="text-violet-400">Every {scheduleDays} day(s) at {scheduleTime}</span>
+					{/if}
 				</p>
 				<div class="flex overflow-hidden rounded-lg border border-chat-border text-[10px]">
 					<button
-						onclick={() => switchIntervalMode('minutes')}
-						class="px-3 py-1 transition-colors {intervalMode === 'minutes'
+						onclick={() => switchScheduleType('minutes')}
+						class="px-2 py-1 transition-colors {scheduleType === 'minutes'
 							? 'bg-violet-600 text-white'
 							: 'bg-chat-raised text-slate-500 hover:text-slate-300'}"
 					>
 						Minutes
 					</button>
 					<button
-						onclick={() => switchIntervalMode('days')}
-						class="px-3 py-1 transition-colors {intervalMode === 'days'
+						onclick={() => switchScheduleType('daily')}
+						class="px-2 py-1 transition-colors {scheduleType === 'daily'
 							? 'bg-violet-600 text-white'
 							: 'bg-chat-raised text-slate-500 hover:text-slate-300'}"
 					>
-						Days
+						Daily
+					</button>
+					<button
+						onclick={() => switchScheduleType('days')}
+						class="px-2 py-1 transition-colors {scheduleType === 'days'
+							? 'bg-violet-600 text-white'
+							: 'bg-chat-raised text-slate-500 hover:text-slate-300'}"
+					>
+						Every N days
 					</button>
 				</div>
 			</div>
 
-			{#if intervalMode === 'minutes'}
+			{#if scheduleType === 'minutes'}
 				<input
 					id="bundle-timer"
 					type="range"
@@ -218,17 +255,38 @@
 					<span>12h</span>
 					<span>24h</span>
 				</div>
-			{:else}
+			{:else if scheduleType === 'daily'}
 				<div class="flex items-center gap-3">
+					<label for="schedule-time-daily" class="text-xs text-slate-500">Time</label>
 					<input
-						type="number"
-						value={dayInput}
-						oninput={(e) => handleDayInput((e.target as HTMLInputElement).value)}
-						min={1}
-						max={365}
-						class="w-24 rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-center text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
+						id="schedule-time-daily"
+						type="time"
+						bind:value={scheduleTime}
+						class="rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
 					/>
-					<span class="text-xs text-slate-500">days ({dayInput * 24}h)</span>
+				</div>
+			{:else}
+				<div class="flex flex-wrap items-center gap-3">
+					<div class="flex items-center gap-2">
+						<input
+							type="number"
+							value={dayInput}
+							oninput={(e) => handleDayInput((e.target as HTMLInputElement).value)}
+							min={1}
+							max={365}
+							class="w-20 rounded-xl border border-chat-border bg-chat-raised px-3 py-2 text-center text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
+						/>
+						<span class="text-xs text-slate-500">day(s)</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<label for="schedule-time-days" class="text-xs text-slate-500">at</label>
+						<input
+							id="schedule-time-days"
+							type="time"
+							bind:value={scheduleTime}
+							class="rounded-xl border border-chat-border bg-chat-raised px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors focus:border-violet-500/40"
+						/>
+					</div>
 				</div>
 			{/if}
 		</div>

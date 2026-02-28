@@ -21,6 +21,14 @@
 		}
 		return `${minutes}m`;
 	}
+
+	function scheduleLabel(bundle: { scheduleType?: string; scheduleTime?: string; scheduleDays?: number; autoTimeSetting: number }): string {
+		const st = bundle.scheduleType ?? 'minutes';
+		const time = bundle.scheduleTime ?? '09:00';
+		if (st === 'daily') return `Daily ${time}`;
+		if (st === 'days') return `Every ${bundle.scheduleDays ?? 1}d ${time}`;
+		return formatTimer(bundle.autoTimeSetting);
+	}
 </script>
 
 <div class="flex h-screen overflow-hidden bg-chat-bg text-slate-200">
@@ -76,7 +84,7 @@
 							<p class="flex-1 truncate text-sm font-medium">{bundle.title}</p>
 						</div>
 						<div class="mt-1 flex items-center gap-2 pl-4 text-[10px] text-slate-600">
-							<span>{formatTimer(bundle.autoTimeSetting)}</span>
+							<span>{scheduleLabel(bundle)}</span>
 							<span>&middot;</span>
 							<span>{bundle.autoReferUrl.length} URL{bundle.autoReferUrl.length > 1 ? 's' : ''}</span>
 							{#if bundle.isActive}

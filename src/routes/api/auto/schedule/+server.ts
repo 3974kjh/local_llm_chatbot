@@ -10,6 +10,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		const {
 			title,
 			autoTimeSetting,
+			scheduleType,
+			scheduleTime,
+			scheduleDays,
 			autoApplyText,
 			autoReferUrl,
 			enableWebSearch,
@@ -18,20 +21,27 @@ export const POST: RequestHandler = async ({ request }) => {
 			telegramChatId
 		} = body;
 
-		if (!id || !title || !autoTimeSetting || !autoApplyText || !autoReferUrl?.length) {
+		if (!id || !title || !autoApplyText || !autoReferUrl?.length) {
 			return json({ success: false, error: 'Missing required fields' }, { status: 400 });
+		}
+		const st = scheduleType ?? 'minutes';
+		if (st === 'minutes' && (autoTimeSetting == null || autoTimeSetting < 1)) {
+			return json({ success: false, error: 'autoTimeSetting required for minutes mode' }, { status: 400 });
 		}
 
 		startSchedule(
 			id,
 			title,
-			autoTimeSetting,
+			Number(autoTimeSetting) || 60,
 			autoApplyText,
 			autoReferUrl,
 			!!enableWebSearch,
 			!!telegramEnabled,
 			(telegramBotToken ?? '').trim(),
-			(telegramChatId ?? '').trim()
+			(telegramChatId ?? '').trim(),
+			st,
+			(typeof scheduleTime === 'string' && scheduleTime) ? scheduleTime.trim() : '09:00',
+			Math.max(1, Math.min(365, Number(scheduleDays) || 1))
 		);
 		return json({ success: true });
 	}

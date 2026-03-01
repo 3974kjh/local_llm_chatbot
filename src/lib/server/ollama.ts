@@ -3,6 +3,9 @@ import axios from 'axios';
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
 
+/** 스트리밍 채팅: 첫 응답·토큰이 늦어도 타임아웃 방지 (10분) */
+const STREAM_TIMEOUT_MS = 600_000;
+
 export interface OllamaMessage {
 	role: string;
 	content: string;
@@ -23,9 +26,18 @@ export async function createOllamaStream(messages: OllamaMessage[], systemPrompt
 		},
 		{
 			responseType: 'stream',
-			timeout: 120000
+			timeout: STREAM_TIMEOUT_MS
 		}
 	);
+}
+
+/** Ollama 타임아웃 여부 (axios ECONNABORTED / message에 timeout 포함) */
+export function isOllamaTimeoutError(error: unknown): boolean {
+	if (error && typeof error === 'object') {
+		if ('code' in error && (error as { code?: string }).code === 'ECONNABORTED') return true;
+		if (error instanceof Error && /timeout|timed out/i.test(error.message)) return true;
+	}
+	return false;
 }
 
 export async function checkOllamaHealth(): Promise<boolean> {

@@ -141,20 +141,7 @@
 		}
 
 		titleError = null;
-		const time = normalizeScheduleTime(scheduleTime);
-		const data: BundleFormData = {
-			title,
-			autoTimeSetting: scheduleType === 'minutes' ? autoTimeSetting : scheduleType === 'daily' ? 1440 : scheduleDays * 1440,
-			scheduleType,
-			scheduleTime: time,
-			scheduleDays: Math.max(1, Math.min(365, scheduleDays)),
-			autoApplyText,
-			autoReferUrl: autoReferUrl.filter((u) => u.trim()),
-			enableWebSearch,
-			telegramEnabled,
-			telegramBotId: telegramBotId.trim(),
-			telegramChatId: telegramChatId.trim()
-		};
+		const data = getFormData();
 
 		if (isNew) {
 			autoStore.createBundle(data);
@@ -177,11 +164,37 @@
 		});
 	}
 
+	function getFormData(): BundleFormData {
+		const time = normalizeScheduleTime(scheduleTime);
+		return {
+			title,
+			autoTimeSetting: scheduleType === 'minutes' ? autoTimeSetting : scheduleType === 'daily' ? 1440 : scheduleDays * 1440,
+			scheduleType,
+			scheduleTime: time,
+			scheduleDays: Math.max(1, Math.min(365, scheduleDays)),
+			autoApplyText,
+			autoReferUrl: autoReferUrl.filter((u) => u.trim()),
+			enableWebSearch,
+			telegramEnabled,
+			telegramBotId: telegramBotId.trim(),
+			telegramChatId: telegramChatId.trim()
+		};
+	}
+
 	function handleToggleActive() {
 		if (!bundle) return;
 		if (bundle.isActive) {
 			autoStore.stopBundle(bundle.id);
 		} else {
+			// 스케줄 켜기 전에 현재 폼 값을 저장해 두어, 다른 번들 갔다 와도 설정이 유지되도록 함
+			const validationError = autoStore.validateTitle(title, bundle.id);
+			if (validationError) {
+				titleError = validationError;
+				return;
+			}
+			titleError = null;
+			const data = getFormData();
+			autoStore.updateBundle(bundle.id, data);
 			autoStore.startBundle(bundle.id);
 		}
 	}

@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { createOllamaStream } from '$lib/server/ollama';
+import { createOllamaStream, isOllamaTimeoutError } from '$lib/server/ollama';
 import { searchWeb, formatSearchContext } from '$lib/server/search';
 import { fetchUrlContent } from '$lib/server/scraper';
 
@@ -153,8 +153,11 @@ ${searchSection}`;
 			} catch (error: unknown) {
 				let errorMsg = 'Failed to connect to Ollama';
 
-				if (error && typeof error === 'object' && 'code' in error) {
-					if (error.code === 'ECONNREFUSED') {
+				if (isOllamaTimeoutError(error)) {
+					errorMsg =
+						'Ollama 응답이 지연되어 타임아웃되었습니다. 모델이 로딩 중이거나 부하가 크면 발생할 수 있습니다. 잠시 후 다시 시도해 주세요.';
+				} else if (error && typeof error === 'object' && 'code' in error) {
+					if ((error as { code?: string }).code === 'ECONNREFUSED') {
 						errorMsg =
 							'Ollama is not running. Please start Ollama with "ollama serve" and ensure the llama3.1:8b model is pulled.';
 					}

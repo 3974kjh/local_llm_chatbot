@@ -6,6 +6,8 @@ import { sendMessageChunked as sendTelegramChunked } from './telegram';
 
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
+/** Auto 실행 시 Ollama 응답 대기 (긴 프롬프트·느린 환경 대비, 10분) */
+const OLLAMA_REQUEST_TIMEOUT_MS = 600_000;
 
 type ScheduleType = 'minutes' | 'daily' | 'days';
 
@@ -35,6 +37,15 @@ const activeTasks = new Map<string, ScheduledTask>();
 
 const TICK_MS = 60 * 1000;
 
+/** 동일 시각에 여러 번들이 떠도 Ollama 동시 요청 수 제한 (GPU OOM·지연 방지) */
+const MAX_CONCURRENT_OLLAMA = 2;
+
+function getRunningTaskCount(): number {
+	let n = 0;
+	for (const task of activeTasks.values()) if (task.isRunning) n++;
+	return n;
+}
+
 /** Next run at scheduleTime today or tomorrow. */
 function getNextRunDaily(scheduleTime: string): number {
 	const [h, m] = scheduleTime.split(':').map(Number);
@@ -59,6 +70,11 @@ function runTimeBasedTick(): void {
 		if (task.scheduleType !== 'daily' && task.scheduleType !== 'days') continue;
 		if (task.nextRunAt == null || task.isRunning) continue;
 		if (now < task.nextRunAt) continue;
+		if (getRunningTaskCount() >= MAX_CONCURRENT_OLLAMA) {
+			task.nextRunAt = now + 60_000;
+			console.log(`[Scheduler] Deferring "${task.title}" (scheduled-time): at concurrency limit, retry in 1min`);
+			continue;
+		}
 		task.nextRunAt = null;
 		runTask(task, 'scheduled-time').then(() => {
 			if (task.scheduleType === 'daily') {
@@ -260,22 +276,40 @@ export async function executeBundle(
 
 		userPrompt += `\n\n[지시]\n위 맥락만 사용해 사용자 요청에 맞게 답하세요. 단순 질문이면 한두 문장으로, 정리·요약 요청이면 맥락에서 인용해 정리하세요.`;
 
-		const ollamaResponse = await axios.post(
-			`${OLLAMA_URL}/api/chat`,
-			{
-				model: MODEL,
-				messages: [
-					{ role: 'system', content: systemPrompt },
-					{ role: 'user', content: userPrompt }
-				],
-				stream: false,
-				options: {
-					num_predict: 8192,
-					temperature: 0.1
-				}
-			},
-			{ timeout: 180000, ...(signal && { signal }) }
-		);
+		const ollamaPost = () =>
+			axios.post<{ message?: { content?: string } }>(
+				`${OLLAMA_URL}/api/chat`,
+				{
+					model: MODEL,
+					messages: [
+						{ role: 'system', content: systemPrompt },
+						{ role: 'user', content: userPrompt }
+					],
+					stream: false,
+					options: {
+						num_predict: 8192,
+						temperature: 0.1
+					}
+				},
+				{ timeout: OLLAMA_REQUEST_TIMEOUT_MS, ...(signal && { signal }) }
+			);
+
+		let ollamaResponse: Awaited<ReturnType<typeof ollamaPost>>;
+		try {
+			ollamaResponse = await ollamaPost();
+		} catch (firstError: unknown) {
+			const isTimeout =
+				firstError &&
+				typeof firstError === 'object' &&
+				'code' in firstError &&
+				(firstError as { code?: string }).code === 'ECONNABORTED';
+			if (isTimeout && !signal?.aborted) {
+				console.warn(`[Scheduler] Ollama timeout for "${title}", retrying once...`);
+				ollamaResponse = await ollamaPost();
+			} else {
+				throw firstError;
+			}
+		}
 
 		const researchResultText = ollamaResponse.data.message?.content || '';
 		console.log(`[Scheduler] Ollama returned ${researchResultText.length} chars`);
@@ -453,10 +487,18 @@ export function startSchedule(
 				clearInterval(task.timer);
 				return;
 			}
+			if (getRunningTaskCount() >= MAX_CONCURRENT_OLLAMA) {
+				console.log(`[Scheduler] Skipping "${title}" (interval): at concurrency limit, next interval will retry`);
+				return;
+			}
 			runTask(task, 'interval');
 		}, intervalMs);
 		activeTasks.set(id, task);
-		runTask(task, 'immediate');
+		if (getRunningTaskCount() < MAX_CONCURRENT_OLLAMA) {
+			runTask(task, 'immediate');
+		} else {
+			console.log(`[Scheduler] Deferring immediate run for "${title}": at concurrency limit`);
+		}
 	} else {
 		task.nextRunAt = getNextRunDaily(scheduleTime);
 		console.log(

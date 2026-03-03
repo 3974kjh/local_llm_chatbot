@@ -1,9 +1,7 @@
 ---
 description: Svelte 5 runes and project code style
-globs: "**/*.svelte,**/*.svelte.ts"
 alwaysApply: false
 ---
-
 # Svelte 5 & Project Style
 
 ## 스토어 (Stores)

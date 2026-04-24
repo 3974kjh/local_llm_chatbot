@@ -145,6 +145,8 @@ export async function streamDeepSearch(
 				try {
 					const data = JSON.parse(line.slice(6));
 					switch (data.type) {
+						case 'keepalive':
+							break;
 						case 'plan':
 							callbacks.onStep({ type: 'plan', subQueries: data.subQueries, strategy: data.strategy, subQuestions: data.subQuestions, stopCriteria: data.stopCriteria });
 							break;

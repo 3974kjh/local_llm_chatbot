@@ -1,5 +1,10 @@
 import type { RequestHandler } from './$types';
 import { createOllamaStream, isOllamaTimeoutError } from '$lib/server/ollama';
+import {
+	CHAT_NO_SEARCH_KO,
+	RESPONSE_LANGUAGE_KO,
+	WEB_FIRST_GROUNDING
+} from '$lib/server/promptLocale';
 import { resolveSearchCalendarDate } from '$lib/server/searchDate';
 import { searchWeb, formatSearchContext } from '$lib/server/search';
 import { fetchUrlContent } from '$lib/server/scraper';
@@ -63,7 +68,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		currentDate ||
 		`Today is ${resolveSearchCalendarDate(localeCalendarDate, currentDate)} (local calendar).`;
 
-	const conversationContext = `You are a helpful AI assistant named JukimBot. You are having an ongoing conversation with the user. Pay close attention to the entire conversation history provided - refer back to previous questions and answers to maintain context and coherence. If the user asks a follow-up question, relate your answer to what was discussed before.\n\n**Current Date/Time:** ${dateInfo}\nAlways be aware of today's date when answering questions about current events.`;
+	const conversationContext = `You are a helpful AI assistant named JukimBot. You are having an ongoing conversation with the user. Pay close attention to the entire conversation history provided - refer back to previous questions and answers to maintain context and coherence. If the user asks a follow-up question, relate your answer to what was discussed before.\n\n**Current Date/Time:** ${dateInfo}\nAlways be aware of today's date when answering questions about current events.
+
+${RESPONSE_LANGUAGE_KO}`;
 
 	let systemPrompt: string;
 	if (searchContext || detailContext) {
@@ -77,16 +84,19 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		systemPrompt = `${conversationContext}
 
-IMPORTANT: You have access to REAL-TIME web search results and detailed page content from today's internet. These contain the LATEST, most up-to-date information available right now.
-- ALWAYS prioritize information from the search results and detailed content over your training data.
-- Your training data may be outdated. The search results below are from TODAY and are more reliable for current events, prices, news, and recent developments.
-- When answering, base your response primarily on the provided search data.
-- Cite sources naturally when referencing specific information.
-- If the search results contradict your training data, trust the search results.
-- For markets (stocks, indices, FX): quote numbers and dates ONLY as they appear in the search snippets or detailed page text; name the trading session or source date when given. If figures conflict across sources, say so briefly instead of guessing.
+${WEB_FIRST_GROUNDING}
+
+아래 웹 검색 스니펫·상세 페이지는 질의 시점에 가져온 자료다. 수치·날짜·뉴스는 이 블록을 최우선 근거로 삼는다. 검색 스니펫이 비어 있거나 근거가 부족하면 한국어로 근거 부족을 말한다.
+- 인용 시 출처를 자연스럽게 밝힌다.
+- 검색 자료와 학습 지식이 충돌하면 검색 자료를 따른다.
+- 증시·지수·환율: 스니펫·상세 본문에 나온 숫자·날짜만 인용하고, 장·기준일이 있으면 명시한다. 출처 간 수치가 다르면 짧게 불일치를 알린다.
 ${searchSection}`;
 	} else {
-		systemPrompt = `${conversationContext}\n\nProvide clear, accurate, and well-structured answers. Use markdown formatting when appropriate for better readability. Note: Web search is not available for this query, so your response is based on your training data which may not reflect the very latest information. Let the user know if the topic might require more current data.`;
+		systemPrompt = `${conversationContext}
+
+${CHAT_NO_SEARCH_KO}
+
+마크다운으로 가독성 있게 정리해도 된다.`;
 	}
 
 	const stream = new ReadableStream({

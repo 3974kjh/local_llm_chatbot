@@ -4,8 +4,13 @@ import { env } from '$env/dynamic/private';
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
 
-/** 스트리밍 채팅: 첫 응답·토큰이 늦어도 타임아웃 방지 (10분) */
-const STREAM_TIMEOUT_MS = 600_000;
+/** 스트리밍 Ollama: 긴 딥서치 합성·채팅용 (기본 30분, env로 조절) */
+const DEFAULT_STREAM_TIMEOUT_MS = 1_800_000;
+
+function streamTimeoutMs(explicit?: number): number {
+	if (explicit != null && explicit > 0) return explicit;
+	return readEnvInt(env.OLLAMA_STREAM_TIMEOUT_MS, DEFAULT_STREAM_TIMEOUT_MS);
+}
 
 export interface OllamaMessage {
 	role: string;
@@ -25,6 +30,8 @@ export interface CreateOllamaStreamOptions {
 	streamKind?: OllamaStreamKind;
 	/** If set, overrides env-based num_predict for this request. */
 	numPredict?: number;
+	/** Axios timeout for this stream (ms). Overrides OLLAMA_STREAM_TIMEOUT_MS. */
+	timeoutMs?: number;
 }
 
 export async function createOllamaStream(
@@ -55,7 +62,7 @@ export async function createOllamaStream(
 
 	return axios.post(`${OLLAMA_URL}/api/chat`, body, {
 		responseType: 'stream',
-		timeout: STREAM_TIMEOUT_MS
+		timeout: streamTimeoutMs(options?.timeoutMs)
 	});
 }
 
@@ -68,8 +75,8 @@ export function isOllamaTimeoutError(error: unknown): boolean {
 	return false;
 }
 
-/** 논스트리밍: 플래너/평가자/아웃라인 등 (기본 10분, env로 조절) */
-const DEFAULT_NON_STREAM_TIMEOUT_MS = 600_000;
+/** 논스트리밍: 플래너/평가자/아웃라인 등 (기본 30분 — 딥서치 다라운드 대비, env로 조절) */
+const DEFAULT_NON_STREAM_TIMEOUT_MS = 1_800_000;
 
 function nonStreamTimeoutMs(explicit?: number): number {
 	if (explicit != null && explicit > 0) return explicit;

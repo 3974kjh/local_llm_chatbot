@@ -73,6 +73,7 @@ export type DeepSearchEvent =
 			unresolvedItems: string[];
 		}
 	| { type: 'synthesis_start' }
+	| { type: 'keepalive' }
 	| { type: 'complete'; stopReason: string; confidence: number }
 	| { type: 'token'; content: string }
 	| { type: 'done' }

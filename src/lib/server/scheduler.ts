@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { RESPONSE_LANGUAGE_KO, WEB_FIRST_GROUNDING } from './promptLocale';
 import { fetchMultipleUrls, fetchUrlContent } from './scraper';
 import { searchWeb, formatSearchContext } from './search';
 import { sendMessageChunked, isConnected as isKakaoConnected } from './kakao';
@@ -251,6 +252,10 @@ export async function executeBundle(
 
 		const systemPrompt = `You are an assistant that answers the user's request using ONLY the context provided below (attached URLs and/or web search results).
 
+${RESPONSE_LANGUAGE_KO}
+
+${WEB_FIRST_GROUNDING}
+
 === RULES ===
 1. Use ONLY the text between the ========== markers. Do not invent or guess information.
 2. Match the user's intent:
@@ -258,7 +263,7 @@ export async function executeBundle(
    - If they ask to summarize or analyze articles/URLs: extract headlines and summarize from the context. Quote key phrases from the text.
    - If they ask for a list or comparison: respond in a clear list format.
 3. "Today" / "오늘" = the execution date/time stated in the user message. Use it for weather, date-related answers.
-4. Output: plain text, no markdown # or **. Use line breaks and "- " for lists. Match the user's language (Korean or English).`;
+4. Output: plain text, no markdown # or **. Use line breaks and "- " for lists. 답변 본문은 항상 한국어로만 작성한다.`;
 
 		let userPrompt = `[실행 기준 일시 (오늘)] ${todayStr} (${todayLocal})\n\n[사용자 요청]\n${autoApplyText}\n\n아래 제공된 맥락(첨부 URL·웹 검색 결과)만 사용해서 위 요청에 답하세요. 요청이 날씨·날짜·단순 질문이면 짧고 심플하게, 기사/URL 정리 요청이면 요약·인용으로 답하세요.\n`;
 

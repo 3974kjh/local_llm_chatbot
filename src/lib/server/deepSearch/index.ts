@@ -1,4 +1,5 @@
 import { DEEP_SEARCH_BUDGET } from '$lib/deepSearchBudget';
+import { resolveSearchCalendarDate } from '../searchDate';
 import type { OllamaMessage } from '../ollama';
 import { planQuery } from './queryPlanner';
 import {
@@ -39,12 +40,39 @@ export interface DeepSearchOptions {
 	messages: OllamaMessage[];
 	userQuery: string;
 	currentDate: string;
+	/** Client YYYY-MM-DD for search recency (same as chat API). */
+	localeCalendarDate?: string;
 	enqueue: (data: Record<string, unknown>) => void;
 	signal?: AbortSignal;
 	seedUrls?: string[];
 }
 
 export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
+	const calendarDate = resolveSearchCalendarDate(options.localeCalendarDate, options.currentDate);
+
+	let keepAlive: ReturnType<typeof setInterval> | null = null;
+	keepAlive = setInterval(() => {
+		try {
+			options.enqueue({ type: 'keepalive' });
+		} catch {
+			// Response stream may already be closed
+		}
+	}, 20_000);
+
+	try {
+		await runDeepSearchImpl(options, calendarDate);
+	} finally {
+		if (keepAlive) {
+			clearInterval(keepAlive);
+			keepAlive = null;
+		}
+	}
+}
+
+async function runDeepSearchImpl(
+	options: DeepSearchOptions,
+	calendarDate: string
+): Promise<void> {
 	const { messages, userQuery, currentDate, enqueue, signal, seedUrls } = options;
 
 	const conversationContext =
@@ -99,7 +127,8 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 		userQuery,
 		currentDate,
 		conversationContext,
-		attachmentContextPreview || undefined
+		attachmentContextPreview || undefined,
+		calendarDate
 	);
 
 	enqueue({
@@ -146,7 +175,7 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 		// Execute research in parallel
 		const roundResults = await Promise.all(
 			currentQueries.map((q) =>
-				executeResearch(q, seenUrls, BUDGET.urlsPerQuery, signal)
+				executeResearch(q, seenUrls, BUDGET.urlsPerQuery, signal, calendarDate)
 			)
 		);
 		if (signal?.aborted) return;
@@ -190,7 +219,8 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			round,
 			BUDGET.minRounds,
 			BUDGET.maxRounds,
-			BUDGET.confidenceThreshold
+			BUDGET.confidenceThreshold,
+			calendarDate
 		);
 
 		lastConfidence = evaluation.confidence ?? lastConfidence;

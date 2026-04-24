@@ -25,6 +25,8 @@ export const POST: RequestHandler = async ({ request }) => {
 					currentDate:
 						currentDate ||
 						`Today is ${resolveSearchCalendarDate(localeCalendarDate, undefined)} (local calendar).`,
+					localeCalendarDate:
+						typeof localeCalendarDate === 'string' ? localeCalendarDate : undefined,
 					enqueue,
 					signal: abortController.signal,
 					seedUrls: Array.isArray(seedUrls) ? seedUrls : undefined

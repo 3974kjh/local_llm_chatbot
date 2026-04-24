@@ -1,3 +1,4 @@
+import { normalizeSearchQueryForRecency } from '../searchDate';
 import { normalizeHttpUrl } from '$lib/utils/helpers';
 import { searchWeb } from '../search';
 import { fetchUrlContent } from '../scraper';
@@ -21,13 +22,23 @@ export async function executeResearch(
 	query: string,
 	seenUrls: Set<string>,
 	urlsPerQuery: number,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	calendarDate?: string
 ): Promise<ResearchResult> {
-	console.log(`[ResearchExecutor] Searching: "${query}"`);
+	const effectiveQuery =
+		calendarDate && /^\d{4}-\d{2}-\d{2}$/.test(calendarDate.trim())
+			? normalizeSearchQueryForRecency(query, calendarDate.trim())
+			: query.trim();
+
+	if (effectiveQuery !== query.trim()) {
+		console.log(`[ResearchExecutor] Searching (recency): "${effectiveQuery}"`);
+	} else {
+		console.log(`[ResearchExecutor] Searching: "${effectiveQuery}"`);
+	}
 
 	// Fetch more candidate results so we have enough after filtering seen URLs
 	const maxCandidates = Math.max(30, urlsPerQuery * 6);
-	const allResults = await searchWeb(query, signal, maxCandidates);
+	const allResults = await searchWeb(effectiveQuery, signal, maxCandidates);
 
 	const results: SearchResult[] = [];
 	const pageContents: Array<{ url: string; content: string }> = [];
@@ -59,7 +70,7 @@ export async function executeResearch(
 		}
 	}
 
-	return { query, results, pageContents };
+	return { query: effectiveQuery, results, pageContents };
 }
 
 // ---------------------------------------------------------------------------

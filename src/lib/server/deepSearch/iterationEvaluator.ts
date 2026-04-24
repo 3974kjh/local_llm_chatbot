@@ -1,4 +1,6 @@
 import { extractFirstJsonObject } from '../extractJsonObject';
+import { WEB_FIRST_GROUNDING } from '../promptLocale';
+import { normalizeSearchQueryForRecency } from '../searchDate';
 import { callOllamaNonStreaming } from '../ollama';
 
 export interface EvaluationResult {
@@ -11,23 +13,34 @@ export interface EvaluationResult {
 	needsMore: boolean;
 }
 
-function buildEvaluatorSystemPrompt(minRounds: number, maxRounds: number, confidenceThreshold: number) {
-	return `You are a research quality evaluator. Given a user's question, a checklist of stop criteria, and the research gathered so far, assess how complete the research is.
+function buildEvaluatorSystemPrompt(
+	minRounds: number,
+	maxRounds: number,
+	confidenceThreshold: number,
+	calendarDate: string
+) {
+	return `You are a research quality evaluator. Your ONLY job is to assess the research text given in the user message. You must NEVER use training knowledge to fill gaps.
+
+${WEB_FIRST_GROUNDING}
+
+언어: "thought"는 반드시 한국어로 작성한다. "resolvedItems"·"unresolvedItems"의 각 문자열도 한국어로 작성한다. JSON 키 이름은 영어로 유지한다.
 
 RULES:
-- Check each stop criterion: mark it "resolved" if the research clearly addresses it, "unresolved" otherwise
-- confidence: a number from 0.0 to 1.0 representing how completely the research answers the question (0 = nothing found, 1 = fully answered with strong evidence)
-- If needsMore is true, provide 1-3 specific nextQueries to fill the gaps (DIFFERENT from any queries already tried)
-- Be honest and critical — do not over-estimate confidence
-- Until round ${minRounds} of ${maxRounds}, be conservative: prefer needsMore true with concrete nextQueries unless multiple independent sources clearly satisfy every stop criterion. Use confidence >= ${confidenceThreshold} only when evidence is strong.
-- Return ONLY valid JSON, no markdown, no explanation
+- "resolved": 연구 스니펫·페이지 본문에 기준이 명시적으로 충족될 때만 — 학습 지식으로 '있을 것'이라 추정하면 안 된다.
+- "unresolved": 연구 텍스트에 명시적 근거가 부족할 때 — 학습 데이터로 아는 내용이 있어도 자료에 없으면 미해결.
+- confidence: 0.0–1.0. RESEARCH TEXT가 질문을 얼마나 직접 답하는지에만 기반한다.
+- needsMore가 true이면 1–3개의 nextQueries(이미 시도된 것과 중복 금지). 각 nextQuery에 캘린더 날짜 "${calendarDate}"를 반드시 포함한다. 검색어는 한국어·영어 혼용 가능.
+- ${minRounds}라운드 미만까지는 보수적으로: 모든 stop 기준을 독립 근거로 명시 충족하지 않으면 needsMore true. confidence >= ${confidenceThreshold}는 직접 인용 근거가 강할 때만.
+- 연구의 수치·날짜가 과거 연도에만 묶여 있고 사용자 질문이 현재를 요구하면 시점 미충족으로 처리하고 "${calendarDate}"·1차 출처를 넣은 nextQueries를 제안한다.
+- 연구 텍스트 밖 사실을 만들어내지 않는다.
+- Return ONLY valid JSON, no markdown, no explanation.
 
 Output format:
 {
-  "thought": "Brief analysis of what was found and what is missing",
-  "resolvedItems": ["criterion that is now satisfied", ...],
-  "unresolvedItems": ["criterion still missing", ...],
-  "nextQueries": ["gap-filling query 1", ...],
+  "thought": "연구 텍스트에서 확인된 것과 부족한 것을 한국어로 짧게",
+  "resolvedItems": ["자료로 충족된 기준(한국어)", ...],
+  "unresolvedItems": ["자료 부족·시점 불일치 등(한국어)", ...],
+  "nextQueries": ["${calendarDate} 포함 검색어", ...],
   "confidence": 0.65,
   "needsMore": true
 }`;
@@ -36,7 +49,8 @@ Output format:
 function parseEvaluationFromRaw(
 	raw: string,
 	previousQueries: string[],
-	confidenceThreshold: number
+	confidenceThreshold: number,
+	calendarDate: string
 ): EvaluationResult {
 	const jsonStr = extractFirstJsonObject(raw);
 	if (!jsonStr) throw new Error('No JSON object in evaluator response');
@@ -49,12 +63,18 @@ function parseEvaluationFromRaw(
 	const unresolvedItems = Array.isArray(parsed.unresolvedItems)
 		? parsed.unresolvedItems.filter((s) => typeof s === 'string' && s.trim())
 		: [];
-	const nextQueries = Array.isArray(parsed.nextQueries)
+
+	const rawNextQueries = Array.isArray(parsed.nextQueries)
 		? parsed.nextQueries
 				.filter((q) => typeof q === 'string' && q.trim())
 				.filter((q) => !previousQueries.some((prev) => prev.toLowerCase() === q.toLowerCase()))
 				.slice(0, 3)
 		: [];
+
+	// Enforce calendarDate in every nextQuery so recency is maintained across all rounds
+	const nextQueries = rawNextQueries.map((q) =>
+		normalizeSearchQueryForRecency(q, calendarDate)
+	);
 
 	const rawConfidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
 	const confidence = Math.max(0, Math.min(1, rawConfidence));
@@ -64,7 +84,7 @@ function parseEvaluationFromRaw(
 		nextQueries.length > 0;
 
 	return {
-		thought: typeof parsed.thought === 'string' ? parsed.thought : 'Evaluation complete',
+		thought: typeof parsed.thought === 'string' ? parsed.thought : '평가 완료',
 		resolvedItems,
 		unresolvedItems,
 		nextQueries,
@@ -81,13 +101,15 @@ export async function evaluateResearch(
 	round: number,
 	minRounds: number,
 	maxRounds: number,
-	confidenceThreshold: number
+	confidenceThreshold: number,
+	calendarDate: string
 ): Promise<EvaluationResult> {
 	const contextForEval = buildEvalContext(accumulatedContext);
 
 	const userMessage = `User Question: ${userQuery}
+Calendar date for recency (all nextQueries must include this exact date): ${calendarDate}
 
-Stop Criteria (checklist — mark each as resolved or unresolved):
+Stop Criteria (resolved ONLY when RESEARCH TEXT explicitly addresses them — not from your training):
 ${stopCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
 Queries already tried (do NOT repeat these in nextQueries):
@@ -96,9 +118,9 @@ ${previousQueries.slice(-12).map((q) => `- ${q}`).join('\n')}
 Research gathered so far (Round ${round} of ${maxRounds}, minimum rounds before easy stop: ${minRounds}):
 ${contextForEval}
 
-Evaluate completeness and return JSON.`;
+연구 텍스트만 근거로 완성도를 평가하고 JSON만 출력한다.`;
 
-	const systemPrompt = buildEvaluatorSystemPrompt(minRounds, maxRounds, confidenceThreshold);
+	const systemPrompt = buildEvaluatorSystemPrompt(minRounds, maxRounds, confidenceThreshold, calendarDate);
 
 	let lastErr: unknown;
 	for (let attempt = 0; attempt < 3; attempt++) {
@@ -112,7 +134,7 @@ Evaluate completeness and return JSON.`;
 				systemPrompt,
 				{ numPredict: 2048 }
 			);
-			return parseEvaluationFromRaw(raw, previousQueries, confidenceThreshold);
+			return parseEvaluationFromRaw(raw, previousQueries, confidenceThreshold, calendarDate);
 		} catch (e) {
 			lastErr = e;
 			console.warn(`[IterationEvaluator] attempt ${attempt + 1}/3 failed:`, e);
@@ -121,7 +143,7 @@ Evaluate completeness and return JSON.`;
 
 	console.error('[IterationEvaluator] Failed after retries:', lastErr);
 	return {
-		thought: 'Evaluation failed — proceeding with available research.',
+		thought: '평가에 실패하여 수집된 자료로 진행합니다.',
 		resolvedItems: [],
 		unresolvedItems: stopCriteria,
 		nextQueries: [],

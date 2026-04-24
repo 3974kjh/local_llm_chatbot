@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import type { Conversation, Message } from '$lib/types';
-import { streamChat } from '$lib/services/api';
-import { generateId, getCurrentDateContext } from '$lib/utils/helpers';
+import { streamChat, streamDeepSearch } from '$lib/services/api';
+import { generateId, getCurrentDateContext, normalizeHttpUrl } from '$lib/utils/helpers';
 import { getItem, setItem } from '$lib/db';
 
 const STORAGE_KEY = 'jukimbot-chat-conversations';
@@ -11,6 +11,9 @@ class ChatStore {
 	activeId = $state<string | null>(null);
 	isGenerating = $state(false);
 	searchEnabled = $state(true);
+	deepSearchEnabled = $state(false);
+	/** URLs to fetch before web search when sending a deep-research message. */
+	deepSearchSeedUrls = $state<string[]>([]);
 	sidebarOpen = $state(true);
 
 	private abortController: AbortController | null = null;
@@ -154,6 +157,128 @@ class ChatStore {
 				}
 			},
 			this.abortController.signal
+		);
+	}
+
+	addDeepSearchSeedUrl(url: string) {
+		const trimmed = url.trim();
+		if (!trimmed || this.deepSearchSeedUrls.length >= 8) return;
+		const normalized = normalizeHttpUrl(trimmed);
+		if (!normalized) return;
+		if (this.deepSearchSeedUrls.includes(normalized)) return;
+		this.deepSearchSeedUrls = [...this.deepSearchSeedUrls, normalized];
+	}
+
+	removeDeepSearchSeedUrl(index: number) {
+		this.deepSearchSeedUrls = this.deepSearchSeedUrls.filter((_, i) => i !== index);
+	}
+
+	async sendDeepSearch(content: string) {
+		if (this.isGenerating || !content.trim()) return;
+
+		if (!this.activeId) {
+			this.createConversation();
+		}
+
+		const convId = this.activeId!;
+		const conv = this.conversations.find((c) => c.id === convId);
+		if (!conv) return;
+
+		const seeds = [...this.deepSearchSeedUrls];
+		this.deepSearchSeedUrls = [];
+
+		const userMsg: Message = {
+			id: generateId(),
+			role: 'user',
+			content: content.trim(),
+			timestamp: new Date(),
+			attachedSeedUrls: seeds.length > 0 ? seeds : undefined
+		};
+		conv.messages.push(userMsg);
+
+		if (conv.messages.filter((m) => m.role === 'user').length === 1) {
+			conv.title = content.trim().slice(0, 50) + (content.trim().length > 50 ? '...' : '');
+		}
+
+		const assistantMsg: Message = {
+			id: generateId(),
+			role: 'assistant',
+			content: '',
+			timestamp: new Date(),
+			isStreaming: true,
+			isDeepSearch: true,
+			deepSearchSteps: [],
+			searchResults: []
+		};
+		conv.messages.push(assistantMsg);
+
+		const assistantIdx = conv.messages.length - 1;
+		this.isGenerating = true;
+
+		const MAX_CONTEXT_MESSAGES = 20;
+		const completedMessages = conv.messages.filter(
+			(m) => !m.isStreaming && m.content.trim().length > 0
+		);
+		const recentMessages =
+			completedMessages.length > MAX_CONTEXT_MESSAGES
+				? completedMessages.slice(-MAX_CONTEXT_MESSAGES)
+				: completedMessages;
+		const apiMessages = recentMessages.map((m) => ({ role: m.role, content: m.content }));
+
+		this.abortController = new AbortController();
+		const currentDate = getCurrentDateContext();
+
+		await streamDeepSearch(
+			apiMessages,
+			content.trim(),
+			currentDate,
+			{
+				onStep: (step) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						if (!c.messages[assistantIdx].deepSearchSteps) {
+							c.messages[assistantIdx].deepSearchSteps = [];
+						}
+						c.messages[assistantIdx].deepSearchSteps!.push(step);
+
+						// Collect all sources across iterations for the SourceCard display
+						if (step.type === 'sources' && step.results) {
+							const existing = c.messages[assistantIdx].searchResults ?? [];
+							c.messages[assistantIdx].searchResults = [...existing, ...step.results];
+						}
+					}
+				},
+				onToken: (token) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].content += token;
+					}
+				},
+				onDone: () => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].isStreaming = false;
+						c.updatedAt = new Date();
+					}
+					this.isGenerating = false;
+					this.abortController = null;
+					this.persist();
+				},
+				onError: (message) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						if (!c.messages[assistantIdx].content) {
+							c.messages[assistantIdx].content = `⚠️ ${message}`;
+						}
+						c.messages[assistantIdx].isStreaming = false;
+					}
+					this.isGenerating = false;
+					this.abortController = null;
+					this.persist();
+				}
+			},
+			this.abortController.signal,
+			seeds
 		);
 	}
 

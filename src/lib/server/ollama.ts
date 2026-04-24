@@ -40,6 +40,31 @@ export function isOllamaTimeoutError(error: unknown): boolean {
 	return false;
 }
 
+/** 논스트리밍 채팅: JSON 응답이 필요한 플래너/평가자용 (30초 타임아웃) */
+const NON_STREAM_TIMEOUT_MS = 30_000;
+
+export async function callOllamaNonStreaming(
+	messages: OllamaMessage[],
+	systemPrompt: string
+): Promise<string> {
+	const allMessages: OllamaMessage[] = [
+		{ role: 'system', content: systemPrompt },
+		...messages
+	];
+
+	const response = await axios.post(
+		`${OLLAMA_URL}/api/chat`,
+		{
+			model: MODEL,
+			messages: allMessages,
+			stream: false
+		},
+		{ timeout: NON_STREAM_TIMEOUT_MS }
+	);
+
+	return response.data?.message?.content ?? '';
+}
+
 export async function checkOllamaHealth(): Promise<boolean> {
 	try {
 		const response = await axios.get(`${OLLAMA_URL}/api/tags`, { timeout: 5000 });

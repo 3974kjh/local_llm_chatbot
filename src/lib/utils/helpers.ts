@@ -30,6 +30,24 @@ export function extractDomain(url: string): string {
 	}
 }
 
+/** Normalize user input into an http(s) URL, or null if invalid. */
+export function normalizeHttpUrl(input: string): string | null {
+	const t = input.trim();
+	if (!t) return null;
+	try {
+		if (/^https?:\/\//i.test(t)) {
+			const u = new URL(t);
+			if (!u.hostname) return null;
+			return u.href;
+		}
+		const u = new URL(`https://${t}`);
+		if (!u.hostname || u.hostname.length < 3) return null;
+		return u.href;
+	} catch {
+		return null;
+	}
+}
+
 export function truncate(text: string, maxLength: number): string {
 	if (text.length <= maxLength) return text;
 	return text.slice(0, maxLength) + '...';

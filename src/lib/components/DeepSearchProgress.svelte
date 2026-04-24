@@ -1,0 +1,342 @@
+<script lang="ts">
+	import type { DeepSearchStep } from '$lib/types';
+	import { slide } from 'svelte/transition';
+
+	let { steps, isStreaming }: { steps: DeepSearchStep[]; isStreaming: boolean } = $props();
+
+	// null = no manual override; user clicking toggle sets an explicit boolean
+	let manualOverride = $state<boolean | null>(null);
+	const expanded = $derived(manualOverride !== null ? manualOverride : isStreaming);
+
+	function toggle() {
+		manualOverride = !expanded;
+	}
+
+	const totalSources = $derived(
+		steps
+			.filter((s) => s.type === 'sources')
+			.reduce((acc, s) => acc + (s.results?.length ?? 0), 0)
+	);
+
+	const iterationCount = $derived(steps.filter((s) => s.type === 'iteration_start').length);
+
+	const summaryLine = $derived(
+		[
+			iterationCount > 0 ? `${iterationCount} iteration${iterationCount !== 1 ? 's' : ''}` : null,
+			totalSources > 0 ? `${totalSources} source${totalSources !== 1 ? 's' : ''} found` : null
+		]
+			.filter(Boolean)
+			.join(' · ')
+	);
+</script>
+
+<div
+	class="mb-3 w-full min-w-0 max-w-full overflow-x-hidden rounded-xl border border-chat-border bg-chat-raised"
+>
+	<!-- Header / toggle -->
+	<button
+		onclick={toggle}
+		class="flex w-full min-w-0 max-w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-chat-surface"
+	>
+		<div class="flex min-w-0 shrink items-center gap-2">
+			<!-- Microscope icon -->
+			<svg
+				class="h-4 w-4 text-violet-400 flex-shrink-0"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M6 18h8" />
+				<path d="M3 22h18" />
+				<path d="M14 22a7 7 0 1 0 0-14h-1" />
+				<path d="M9 14h2" />
+				<path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z" />
+				<path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3" />
+			</svg>
+			<span class="text-sm font-medium text-slate-300">Deep Research</span>
+			{#if isStreaming}
+				<span class="flex items-center gap-1">
+					<span class="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse"></span>
+					<span class="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse [animation-delay:150ms]"
+					></span>
+					<span class="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse [animation-delay:300ms]"
+					></span>
+				</span>
+			{/if}
+		</div>
+
+		<div class="ml-6 flex min-w-0 flex-shrink-0 items-center gap-3">
+			{#if !expanded && summaryLine}
+				<span class="max-w-[55vw] truncate text-right text-xs text-slate-500 sm:max-w-md">
+					{summaryLine}
+				</span>
+			{/if}
+			<!-- Chevron -->
+			<svg
+				class="h-4 w-4 text-slate-500 transition-transform duration-200 {expanded
+					? 'rotate-180'
+					: ''}"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<polyline points="6 9 12 15 18 9" />
+			</svg>
+		</div>
+	</button>
+
+	<!-- Expanded steps -->
+	{#if expanded}
+		<div
+			transition:slide={{ duration: 200 }}
+			class="min-w-0 max-w-full overflow-x-hidden px-4 pb-4 pt-1"
+		>
+			<div class="relative flex min-w-0 max-w-full flex-col gap-0">
+				<!-- Vertical timeline line -->
+				<div
+					class="absolute top-3 bottom-3 left-3.5 w-px bg-gradient-to-b from-violet-500/40 via-chat-border to-teal-500/20"
+				></div>
+
+				{#each steps as step, i (i)}
+					<div class="relative flex min-w-0 max-w-full gap-3 py-2">
+						<!-- Step dot -->
+						{#if step.type === 'plan'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-violet-500/15 border border-violet-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-violet-400"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<rect x="5" y="2" width="14" height="20" rx="2" />
+									<path d="M9 7h6M9 11h6M9 15h4" />
+								</svg>
+							</div>
+						{:else if step.type === 'iteration_start'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/15 border border-indigo-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-indigo-400"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+									<path d="M21 3v5h-5" />
+								</svg>
+							</div>
+						{:else if step.type === 'searching'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15 border border-teal-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-teal-400 {isStreaming ? 'animate-spin' : ''}"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<circle cx="11" cy="11" r="8" />
+									<path d="m21 21-4.3-4.3" />
+								</svg>
+							</div>
+						{:else if step.type === 'sources'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15 border border-teal-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-teal-400"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+									<polyline points="14 2 14 8 20 8" />
+								</svg>
+							</div>
+						{:else if step.type === 'evaluation'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 border border-amber-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-amber-400"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<circle cx="12" cy="12" r="10" />
+									<path d="M12 16v-4M12 8h.01" />
+								</svg>
+							</div>
+						{:else if step.type === 'synthesis_start'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/15 border border-indigo-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-indigo-400"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polygon
+										points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+									/>
+								</svg>
+							</div>
+						{/if}
+
+						<!-- Step content -->
+						<div class="min-w-0 max-w-full flex-1 overflow-hidden pt-0.5 break-words [overflow-wrap:anywhere]">
+							{#if step.type === 'plan'}
+								<p class="mb-1 text-xs font-semibold text-violet-300">Planning research</p>
+								{#if step.strategy}
+									<p class="mb-2 text-xs text-slate-400">{step.strategy}</p>
+								{/if}
+								{#if step.subQueries && step.subQueries.length > 0}
+									<div class="flex flex-wrap gap-1.5">
+										{#each step.subQueries as q (q)}
+											<span
+												class="max-w-full rounded-full border border-violet-500/20 bg-violet-500/10 px-2.5 py-0.5 text-[11px] leading-snug text-violet-300 break-words [overflow-wrap:anywhere]"
+											>{q}</span>
+										{/each}
+									</div>
+								{/if}
+							{:else if step.type === 'iteration_start'}
+								<div class="flex flex-wrap items-center gap-2">
+									<p class="text-xs font-semibold text-indigo-300">
+										Iteration {step.iteration ?? '?'}{step.maxIterations
+											? `/${step.maxIterations}`
+											: ''}
+									</p>
+									<span
+										class="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-indigo-500/20 text-[10px] font-bold text-indigo-300 px-1"
+									>{step.iteration}</span>
+								</div>
+							{:else if step.type === 'searching'}
+								<div class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+									<span class="flex-shrink-0 text-xs text-slate-400">Searching:</span>
+									<span class="text-xs font-medium text-teal-300 break-all [overflow-wrap:anywhere]">
+										"{step.query}"
+									</span>
+								</div>
+							{:else if step.type === 'sources'}
+								<div class="flex min-w-0 flex-wrap items-center gap-1.5">
+									<span
+										class="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium text-teal-300"
+									>
+										<span
+											class="inline-flex h-4 min-w-4 items-center justify-center rounded bg-teal-500/15 px-1 text-[10px] font-bold text-teal-300"
+										>{step.results?.length ?? 0}</span>
+										source{(step.results?.length ?? 0) !== 1 ? 's' : ''} found
+									</span>
+									{#if step.query}
+										<span class="min-w-0 text-xs text-slate-500 break-words">
+											for "{step.query}"
+										</span>
+									{/if}
+								</div>
+								{#if step.results && step.results.length > 0}
+									<ul class="mt-2 flex min-w-0 max-w-full flex-col gap-1.5">
+										{#each step.results as r (r.url)}
+											<li class="min-w-0 max-w-full">
+												<a
+													href={r.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="block max-w-full rounded-lg border border-chat-border bg-chat-surface/60 px-2.5 py-2 transition-colors hover:border-teal-500/35 hover:bg-chat-surface"
+												>
+													<p
+														class="text-xs font-medium text-teal-300 break-words [overflow-wrap:anywhere]"
+													>
+														{r.title}
+													</p>
+													<p class="mt-0.5 break-all text-[10px] text-slate-500 [overflow-wrap:anywhere]">
+														{r.url}
+													</p>
+													{#if r.snippet}
+														<p
+															class="mt-1 text-[11px] leading-snug text-slate-400 break-words [overflow-wrap:anywhere]"
+														>
+															{r.snippet}
+														</p>
+													{/if}
+												</a>
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							{:else if step.type === 'evaluation'}
+								{#if step.thought}
+									<p class="mb-1 text-xs leading-relaxed text-slate-400 break-words [overflow-wrap:anywhere]">
+										{step.thought}
+									</p>
+								{/if}
+								{#if step.needsMore}
+									<div class="flex min-w-0 flex-wrap items-center gap-1.5">
+										<span class="flex-shrink-0 text-xs text-amber-400">→</span>
+										<span class="flex-shrink-0 text-xs text-amber-300">Refining search</span>
+										{#if step.refinedQueries && step.refinedQueries.length > 0}
+											<span class="min-w-0 text-xs text-slate-500 break-words [overflow-wrap:anywhere]">
+												· {step.refinedQueries[0]}
+											</span>
+										{/if}
+									</div>
+								{:else}
+									<div class="flex items-center gap-1.5">
+										<span class="text-teal-400 text-xs">✓</span>
+										<span class="text-xs text-teal-300">Sufficient information gathered</span>
+									</div>
+								{/if}
+							{:else if step.type === 'synthesis_start'}
+								<div class="flex items-center gap-2">
+									<p class="text-xs font-semibold text-indigo-300">
+										Synthesizing final answer
+									</p>
+									{#if isStreaming}
+										<span class="flex items-center gap-0.5">
+											<span
+												class="h-1 w-1 rounded-full bg-indigo-400 animate-pulse"
+											></span>
+											<span
+												class="h-1 w-1 rounded-full bg-indigo-400 animate-pulse [animation-delay:150ms]"
+											></span>
+											<span
+												class="h-1 w-1 rounded-full bg-indigo-400 animate-pulse [animation-delay:300ms]"
+											></span>
+										</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+</div>

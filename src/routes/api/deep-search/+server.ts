@@ -1,8 +1,9 @@
 import type { RequestHandler } from './$types';
 import { runDeepSearch } from '$lib/server/deepSearch';
+import { resolveSearchCalendarDate } from '$lib/server/searchDate';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { messages, query, currentDate, seedUrls } = await request.json();
+	const { messages, query, currentDate, seedUrls, localeCalendarDate } = await request.json();
 
 	const encoder = new TextEncoder();
 	const abortController = new AbortController();
@@ -21,7 +22,9 @@ export const POST: RequestHandler = async ({ request }) => {
 				await runDeepSearch({
 					messages: messages ?? [],
 					userQuery: query,
-					currentDate: currentDate || `Today is ${new Date().toISOString().split('T')[0]}.`,
+					currentDate:
+						currentDate ||
+						`Today is ${resolveSearchCalendarDate(localeCalendarDate, undefined)} (local calendar).`,
 					enqueue,
 					signal: abortController.signal,
 					seedUrls: Array.isArray(seedUrls) ? seedUrls : undefined

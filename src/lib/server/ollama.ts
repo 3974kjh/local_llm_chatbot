@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { env } from '$env/dynamic/private';
 
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL = 'llama3.1:8b';
@@ -11,24 +12,51 @@ export interface OllamaMessage {
 	content: string;
 }
 
-export async function createOllamaStream(messages: OllamaMessage[], systemPrompt: string) {
+function readEnvInt(raw: string | undefined, fallback: number): number {
+	if (raw == null || !String(raw).trim()) return fallback;
+	const n = parseInt(String(raw), 10);
+	return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+export type OllamaStreamKind = 'chat' | 'synthesis' | 'section';
+
+export interface CreateOllamaStreamOptions {
+	/** Drives default num_predict from env when numPredict is unset. */
+	streamKind?: OllamaStreamKind;
+	/** If set, overrides env-based num_predict for this request. */
+	numPredict?: number;
+}
+
+export async function createOllamaStream(
+	messages: OllamaMessage[],
+	systemPrompt: string,
+	options?: CreateOllamaStreamOptions
+) {
 	const allMessages: OllamaMessage[] = [
 		{ role: 'system', content: systemPrompt },
 		...messages
 	];
 
-	return axios.post(
-		`${OLLAMA_URL}/api/chat`,
-		{
-			model: MODEL,
-			messages: allMessages,
-			stream: true
-		},
-		{
-			responseType: 'stream',
-			timeout: STREAM_TIMEOUT_MS
-		}
-	);
+	const kind = options?.streamKind ?? 'chat';
+	const defaultPredict =
+		kind === 'synthesis' || kind === 'section'
+			? readEnvInt(env.OLLAMA_NUM_PREDICT_SYNTH, 8192)
+			: readEnvInt(env.OLLAMA_NUM_PREDICT_STREAM, 4096);
+	const numPredict = options?.numPredict ?? defaultPredict;
+
+	const body: Record<string, unknown> = {
+		model: MODEL,
+		messages: allMessages,
+		stream: true
+	};
+	if (numPredict > 0) {
+		body.options = { num_predict: numPredict };
+	}
+
+	return axios.post(`${OLLAMA_URL}/api/chat`, body, {
+		responseType: 'stream',
+		timeout: STREAM_TIMEOUT_MS
+	});
 }
 
 /** Ollama 타임아웃 여부 (axios ECONNABORTED / message에 timeout 포함) */
@@ -43,24 +71,36 @@ export function isOllamaTimeoutError(error: unknown): boolean {
 /** 논스트리밍 채팅: JSON 응답이 필요한 플래너/평가자용 (30초 타임아웃) */
 const NON_STREAM_TIMEOUT_MS = 30_000;
 
+export interface CallOllamaNonStreamingOptions {
+	/** Max tokens to generate (planner/evaluator/outline). */
+	numPredict?: number;
+}
+
 export async function callOllamaNonStreaming(
 	messages: OllamaMessage[],
-	systemPrompt: string
+	systemPrompt: string,
+	options?: CallOllamaNonStreamingOptions
 ): Promise<string> {
 	const allMessages: OllamaMessage[] = [
 		{ role: 'system', content: systemPrompt },
 		...messages
 	];
 
-	const response = await axios.post(
-		`${OLLAMA_URL}/api/chat`,
-		{
-			model: MODEL,
-			messages: allMessages,
-			stream: false
-		},
-		{ timeout: NON_STREAM_TIMEOUT_MS }
-	);
+	const numPredict =
+		options?.numPredict ?? readEnvInt(env.OLLAMA_NUM_PREDICT_NONSTREAM, 2048);
+
+	const body: Record<string, unknown> = {
+		model: MODEL,
+		messages: allMessages,
+		stream: false
+	};
+	if (numPredict > 0) {
+		body.options = { num_predict: numPredict };
+	}
+
+	const response = await axios.post(`${OLLAMA_URL}/api/chat`, body, {
+		timeout: NON_STREAM_TIMEOUT_MS
+	});
 
 	return response.data?.message?.content ?? '';
 }

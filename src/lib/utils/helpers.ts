@@ -53,6 +53,14 @@ export function truncate(text: string, maxLength: number): string {
 	return text.slice(0, maxLength) + '...';
 }
 
+/** Local calendar date YYYY-MM-DD (not UTC) for search queries and consistent copy. */
+export function getLocalCalendarDateYYYYMMDD(d = new Date()): string {
+	const y = d.getFullYear();
+	const m = String(d.getMonth() + 1).padStart(2, '0');
+	const day = String(d.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
 /**
  * Returns a structured string of the current date/time info
  * to provide temporal context to the LLM on every request.
@@ -74,7 +82,7 @@ export function getCurrentDateContext(): string {
 		hour12: true
 	}).format(now);
 
-	const isoDate = now.toISOString().split('T')[0];
+	const localIso = getLocalCalendarDateYYYYMMDD(now);
 
-	return `Today is ${dayOfWeek}, ${dateStr} (${isoDate}). Current local time: ${timeStr}.`;
+	return `Today is ${dayOfWeek}, ${dateStr} (${localIso}). Current local time: ${timeStr}.`;
 }

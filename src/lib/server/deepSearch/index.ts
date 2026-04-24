@@ -1,3 +1,4 @@
+import { DEEP_SEARCH_BUDGET } from '$lib/deepSearchBudget';
 import type { OllamaMessage } from '../ollama';
 import { planQuery } from './queryPlanner';
 import {
@@ -8,19 +9,31 @@ import {
 import { evaluateResearch } from './iterationEvaluator';
 import { synthesizeAnswer } from './answerSynthesizer';
 
-// ---------------------------------------------------------------------------
-// Research budget — tune these to balance quality vs. latency
-// ---------------------------------------------------------------------------
-const BUDGET = {
-	maxRounds: 7,
-	maxTotalUrls: 25,
-	urlsPerQuery: 3,
-	maxQueriesPerRound: 3,
-	/** Stop iterating when confidence reaches this threshold AND all stop criteria resolve */
-	confidenceThreshold: 0.85,
-	/** If this many consecutive rounds yield zero new URLs, stop (search is stuck) */
-	convergenceWindow: 2
-} as const;
+const BUDGET = DEEP_SEARCH_BUDGET;
+
+function buildFallbackQueries(
+	userQuery: string,
+	subQuestions: string[],
+	usedQueries: string[],
+	max: number
+): string[] {
+	const normalizedUsed = new Set(usedQueries.map((q) => q.trim().toLowerCase()));
+	const out: string[] = [];
+	for (const sq of subQuestions) {
+		const piece = sq.trim();
+		if (!piece) continue;
+		const q = `${userQuery} — ${piece}`.trim();
+		const key = q.toLowerCase();
+		if (!normalizedUsed.has(key)) {
+			out.push(q);
+			normalizedUsed.add(key);
+		}
+		if (out.length >= max) return out;
+	}
+	const extra = `${userQuery} verification alternate sources`;
+	if (!normalizedUsed.has(extra.toLowerCase())) out.push(extra);
+	return out.slice(0, max);
+}
 
 export interface DeepSearchOptions {
 	messages: OllamaMessage[];
@@ -140,10 +153,12 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 
 		// Count new URLs fetched this round
 		let newUrlsThisRound = 0;
+		let attemptedUrlsThisRound = 0;
 		for (const result of roundResults) {
 			usedQueries.push(result.query);
 			allIterations.push(result);
 			newUrlsThisRound += result.pageContents.length;
+			attemptedUrlsThisRound += result.results.length;
 			totalUrlsFetched += result.pageContents.length;
 
 			if (result.results.length > 0) {
@@ -151,11 +166,12 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			}
 		}
 
-		// Convergence detection: if search engines keep returning nothing new, stop
-		if (newUrlsThisRound === 0) {
-			consecutiveEmptyRounds++;
-		} else {
+		// Convergence: require both no new successful pages AND no new search attempts
+		const hadResearchActivity = newUrlsThisRound > 0 || attemptedUrlsThisRound > 0;
+		if (hadResearchActivity) {
 			consecutiveEmptyRounds = 0;
+		} else {
+			consecutiveEmptyRounds++;
 		}
 
 		if (consecutiveEmptyRounds >= BUDGET.convergenceWindow) {
@@ -171,7 +187,10 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			plan.stopCriteria,
 			accumulatedContext,
 			usedQueries,
-			round
+			round,
+			BUDGET.minRounds,
+			BUDGET.maxRounds,
+			BUDGET.confidenceThreshold
 		);
 
 		lastConfidence = evaluation.confidence;
@@ -186,14 +205,21 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			unresolvedItems: evaluation.unresolvedItems
 		});
 
-		// --- Stop conditions ---
-		if (evaluation.confidence >= BUDGET.confidenceThreshold && evaluation.unresolvedItems.length === 0) {
+		// --- Stop conditions (do not early-exit before minRounds unless URL budget hit above) ---
+		if (
+			round >= BUDGET.minRounds &&
+			evaluation.confidence >= BUDGET.confidenceThreshold &&
+			evaluation.unresolvedItems.length === 0
+		) {
 			stopReason = `Research complete — confidence ${Math.round(evaluation.confidence * 100)}%, all criteria resolved`;
 			console.log(`[DeepSearch] ${stopReason}`);
 			break;
 		}
 
-		if (!evaluation.needsMore || evaluation.nextQueries.length === 0) {
+		const evaluatorWouldStop =
+			!evaluation.needsMore || evaluation.nextQueries.length === 0;
+
+		if (round >= BUDGET.minRounds && evaluatorWouldStop) {
 			stopReason = `Evaluator satisfied at round ${round} (confidence ${Math.round(evaluation.confidence * 100)}%)`;
 			console.log(`[DeepSearch] ${stopReason}`);
 			break;
@@ -204,8 +230,22 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			break;
 		}
 
-		// Prepare next round queries (deduplicated against usedQueries inside evaluator)
-		currentQueries = evaluation.nextQueries.slice(0, BUDGET.maxQueriesPerRound);
+		// Prepare next round queries
+		let nextQueries = evaluation.nextQueries.slice(0, BUDGET.maxQueriesPerRound);
+		if (nextQueries.length === 0) {
+			nextQueries = buildFallbackQueries(
+				userQuery,
+				plan.subQuestions,
+				usedQueries,
+				BUDGET.maxQueriesPerRound
+			);
+		}
+		if (nextQueries.length === 0) {
+			stopReason = `No further queries available at round ${round}`;
+			console.log(`[DeepSearch] ${stopReason}`);
+			break;
+		}
+		currentQueries = nextQueries;
 		console.log(`[DeepSearch] Round ${round} done. Next: ${currentQueries.join(', ')}`);
 	}
 

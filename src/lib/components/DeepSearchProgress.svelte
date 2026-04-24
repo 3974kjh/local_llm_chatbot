@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { DEEP_SEARCH_BUDGET } from '$lib/deepSearchBudget';
 	import type { DeepSearchStep } from '$lib/types';
 	import { slide } from 'svelte/transition';
 
@@ -19,6 +20,11 @@
 
 	const roundCount = $derived(steps.filter((s) => s.type === 'iteration_start').length);
 
+	const maxRoundsDisplay = $derived(
+		[...steps].reverse().find((s) => s.type === 'iteration_start')?.maxIterations ??
+			DEEP_SEARCH_BUDGET.maxRounds
+	);
+
 	const lastEval = $derived(
 		[...steps].reverse().find((s) => s.type === 'evaluation')
 	);
@@ -34,7 +40,7 @@
 
 	const summaryLine = $derived(
 		[
-			roundCount > 0 ? `Round ${roundCount}/7` : null,
+			roundCount > 0 ? `Round ${roundCount}/${maxRoundsDisplay}` : null,
 			latestUrlCount > 0 ? `${latestUrlCount} pages fetched` : null,
 			lastEval?.confidence != null
 				? `${Math.round(lastEval.confidence * 100)}% confidence`
@@ -46,7 +52,7 @@
 	);
 
 	function confidenceColor(c: number): string {
-		if (c >= 0.85) return 'text-teal-400';
+		if (c >= DEEP_SEARCH_BUDGET.confidenceThreshold) return 'text-teal-400';
 		if (c >= 0.6) return 'text-amber-400';
 		return 'text-red-400';
 	}
@@ -285,7 +291,7 @@
 							{:else if step.type === 'iteration_start'}
 								<div class="flex flex-wrap items-center gap-2">
 									<p class="text-xs font-semibold text-indigo-300">
-										Round {step.iteration ?? '?'}/{step.maxIterations ?? 7}
+										Round {step.iteration ?? '?'}/{step.maxIterations ?? DEEP_SEARCH_BUDGET.maxRounds}
 									</p>
 									{#if step.totalUrlsFetched != null}
 										<span class="text-[10px] text-slate-500">{step.totalUrlsFetched} pages fetched</span>

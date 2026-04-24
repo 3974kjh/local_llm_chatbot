@@ -10,13 +10,15 @@ export interface EvaluationResult {
 	needsMore: boolean;
 }
 
-const EVALUATOR_SYSTEM_PROMPT = `You are a research quality evaluator. Given a user's question, a checklist of stop criteria, and the research gathered so far, assess how complete the research is.
+function buildEvaluatorSystemPrompt(minRounds: number, maxRounds: number, confidenceThreshold: number) {
+	return `You are a research quality evaluator. Given a user's question, a checklist of stop criteria, and the research gathered so far, assess how complete the research is.
 
 RULES:
 - Check each stop criterion: mark it "resolved" if the research clearly addresses it, "unresolved" otherwise
 - confidence: a number from 0.0 to 1.0 representing how completely the research answers the question (0 = nothing found, 1 = fully answered with strong evidence)
 - If needsMore is true, provide 1-3 specific nextQueries to fill the gaps (DIFFERENT from any queries already tried)
 - Be honest and critical — do not over-estimate confidence
+- Until round ${minRounds} of ${maxRounds}, be conservative: prefer needsMore true with concrete nextQueries unless multiple independent sources clearly satisfy every stop criterion. Use confidence >= ${confidenceThreshold} only when evidence is strong.
 - Return ONLY valid JSON, no markdown, no explanation
 
 Output format:
@@ -28,13 +30,17 @@ Output format:
   "confidence": 0.65,
   "needsMore": true
 }`;
+}
 
 export async function evaluateResearch(
 	userQuery: string,
 	stopCriteria: string[],
 	accumulatedContext: string,
 	previousQueries: string[],
-	round: number
+	round: number,
+	minRounds: number,
+	maxRounds: number,
+	confidenceThreshold: number
 ): Promise<EvaluationResult> {
 	// Hierarchical context: always include full source index, truncate page content
 	const contextForEval = buildEvalContext(accumulatedContext);
@@ -47,7 +53,7 @@ ${stopCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 Queries already tried (do NOT repeat these in nextQueries):
 ${previousQueries.slice(-12).map((q) => `- ${q}`).join('\n')}
 
-Research gathered so far (Round ${round}):
+Research gathered so far (Round ${round} of ${maxRounds}, minimum rounds before easy stop: ${minRounds}):
 ${contextForEval}
 
 Evaluate completeness and return JSON.`;
@@ -55,7 +61,7 @@ Evaluate completeness and return JSON.`;
 	try {
 		const raw = await callOllamaNonStreaming(
 			[{ role: 'user', content: userMessage }],
-			EVALUATOR_SYSTEM_PROMPT
+			buildEvaluatorSystemPrompt(minRounds, maxRounds, confidenceThreshold)
 		);
 
 		const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -80,7 +86,7 @@ Evaluate completeness and return JSON.`;
 		const confidence = Math.max(0, Math.min(1, rawConfidence));
 
 		const needsMore =
-			(typeof parsed.needsMore === 'boolean' ? parsed.needsMore : confidence < 0.85) &&
+			(typeof parsed.needsMore === 'boolean' ? parsed.needsMore : confidence < confidenceThreshold) &&
 			nextQueries.length > 0;
 
 		return {

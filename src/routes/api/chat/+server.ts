@@ -1,10 +1,11 @@
 import type { RequestHandler } from './$types';
 import { createOllamaStream, isOllamaTimeoutError } from '$lib/server/ollama';
+import { resolveSearchCalendarDate } from '$lib/server/searchDate';
 import { searchWeb, formatSearchContext } from '$lib/server/search';
 import { fetchUrlContent } from '$lib/server/scraper';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { messages, enableSearch, query, currentDate } = await request.json();
+	const { messages, enableSearch, query, currentDate, localeCalendarDate } = await request.json();
 
 	const encoder = new TextEncoder();
 	let searchResults: { title: string; url: string; snippet: string }[] = [];
@@ -13,9 +14,9 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	if (enableSearch && query) {
 		try {
-			const today = new Date().toISOString().split('T')[0];
-			const searchQuery = `${query} ${today}`;
-			console.log(`[Chat] Web search query: "${searchQuery}"`);
+			const calendarDate = resolveSearchCalendarDate(localeCalendarDate, currentDate);
+			const searchQuery = `${query} ${calendarDate}`;
+			console.log(`[Chat] Web search query: "${searchQuery}" (calendar ${calendarDate})`);
 
 			searchResults = await searchWeb(searchQuery);
 			searchContext = formatSearchContext(searchResults);
@@ -58,7 +59,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 	}
 
-	const dateInfo = currentDate || `Today is ${new Date().toISOString().split('T')[0]}.`;
+	const dateInfo =
+		currentDate ||
+		`Today is ${resolveSearchCalendarDate(localeCalendarDate, currentDate)} (local calendar).`;
 
 	const conversationContext = `You are a helpful AI assistant named JukimBot. You are having an ongoing conversation with the user. Pay close attention to the entire conversation history provided - refer back to previous questions and answers to maintain context and coherence. If the user asks a follow-up question, relate your answer to what was discussed before.\n\n**Current Date/Time:** ${dateInfo}\nAlways be aware of today's date when answering questions about current events.`;
 
@@ -80,6 +83,7 @@ IMPORTANT: You have access to REAL-TIME web search results and detailed page con
 - When answering, base your response primarily on the provided search data.
 - Cite sources naturally when referencing specific information.
 - If the search results contradict your training data, trust the search results.
+- For markets (stocks, indices, FX): quote numbers and dates ONLY as they appear in the search snippets or detailed page text; name the trading session or source date when given. If figures conflict across sources, say so briefly instead of guessing.
 ${searchSection}`;
 	} else {
 		systemPrompt = `${conversationContext}\n\nProvide clear, accurate, and well-structured answers. Use markdown formatting when appropriate for better readability. Note: Web search is not available for this query, so your response is based on your training data which may not reflect the very latest information. Let the user know if the topic might require more current data.`;
@@ -96,7 +100,7 @@ ${searchSection}`;
 			}
 
 			try {
-				const response = await createOllamaStream(messages, systemPrompt);
+				const response = await createOllamaStream(messages, systemPrompt, { streamKind: 'chat' });
 
 				let buffer = '';
 

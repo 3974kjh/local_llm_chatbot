@@ -26,36 +26,36 @@ export async function executeResearch(
 	console.log(`[ResearchExecutor] Searching: "${query}"`);
 
 	// Fetch more candidate results so we have enough after filtering seen URLs
-	const allResults = await searchWeb(query, signal, urlsPerQuery * 3);
+	const maxCandidates = Math.max(30, urlsPerQuery * 6);
+	const allResults = await searchWeb(query, signal, maxCandidates);
 
-	// Deduplicate: prefer unseen URLs, then fill with seen if needed
-	const fresh = allResults.filter((r) => !seenUrls.has(r.url));
-	const results = fresh.slice(0, urlsPerQuery);
-
-	// Mark as seen
-	for (const r of results) seenUrls.add(r.url);
-
+	const results: SearchResult[] = [];
 	const pageContents: Array<{ url: string; content: string }> = [];
 
-	if (results.length > 0) {
-		const fetched = await Promise.allSettled(
-			results.map(async (r) => {
-				try {
-					const content = await fetchUrlContent(r.url, signal);
-					return { url: r.url, content };
-				} catch {
-					return { url: r.url, content: '' };
-				}
-			})
-		);
+	let attempts = 0;
+	const maxAttempts = Math.max(maxCandidates, urlsPerQuery * 8);
 
-		for (const r of fetched) {
-			if (r.status === 'fulfilled' && r.value.content.length > 100) {
-				pageContents.push({
-					url: r.value.url,
-					content: r.value.content.slice(0, MAX_PAGE_CHARS)
-				});
-			}
+	for (const r of allResults) {
+		if (pageContents.length >= urlsPerQuery) break;
+		if (attempts++ >= maxAttempts) break;
+		if (seenUrls.has(r.url)) continue;
+
+		seenUrls.add(r.url);
+
+		let content = '';
+		try {
+			content = await fetchUrlContent(r.url, signal);
+		} catch {
+			content = '';
+		}
+
+		results.push(r);
+
+		if (content.length > 100) {
+			pageContents.push({
+				url: r.url,
+				content: content.slice(0, MAX_PAGE_CHARS)
+			});
 		}
 	}
 

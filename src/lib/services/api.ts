@@ -1,4 +1,5 @@
 import type { DeepSearchStep, SearchResult } from '$lib/types';
+import { getLocalCalendarDateYYYYMMDD } from '$lib/utils/helpers';
 
 export interface StreamCallbacks {
 	onToken: (token: string) => void;
@@ -26,7 +27,13 @@ export async function streamChat(
 		const response = await fetch('/api/chat', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ messages, enableSearch, query, currentDate }),
+			body: JSON.stringify({
+				messages,
+				enableSearch,
+				query,
+				currentDate,
+				localeCalendarDate: getLocalCalendarDateYYYYMMDD()
+			}),
 			signal
 		});
 
@@ -104,7 +111,13 @@ export async function streamDeepSearch(
 		const response = await fetch('/api/deep-search', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ messages, query, currentDate, seedUrls: seedUrls ?? [] }),
+			body: JSON.stringify({
+				messages,
+				query,
+				currentDate,
+				localeCalendarDate: getLocalCalendarDateYYYYMMDD(),
+				seedUrls: seedUrls ?? []
+			}),
 			signal
 		});
 

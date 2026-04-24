@@ -4,7 +4,6 @@
 
 	let { steps, isStreaming }: { steps: DeepSearchStep[]; isStreaming: boolean } = $props();
 
-	// null = no manual override; user clicking toggle sets an explicit boolean
 	let manualOverride = $state<boolean | null>(null);
 	const expanded = $derived(manualOverride !== null ? manualOverride : isStreaming);
 
@@ -18,16 +17,43 @@
 			.reduce((acc, s) => acc + (s.results?.length ?? 0), 0)
 	);
 
-	const iterationCount = $derived(steps.filter((s) => s.type === 'iteration_start').length);
+	const roundCount = $derived(steps.filter((s) => s.type === 'iteration_start').length);
+
+	const lastEval = $derived(
+		[...steps].reverse().find((s) => s.type === 'evaluation')
+	);
+
+	const completeStep = $derived(steps.find((s) => s.type === 'complete'));
+
+	const latestUrlCount = $derived(
+		(() => {
+			const last = [...steps].reverse().find((s) => s.type === 'iteration_start');
+			return last?.totalUrlsFetched ?? 0;
+		})()
+	);
 
 	const summaryLine = $derived(
 		[
-			iterationCount > 0 ? `${iterationCount} iteration${iterationCount !== 1 ? 's' : ''}` : null,
-			totalSources > 0 ? `${totalSources} source${totalSources !== 1 ? 's' : ''} found` : null
+			roundCount > 0 ? `Round ${roundCount}/7` : null,
+			latestUrlCount > 0 ? `${latestUrlCount} pages fetched` : null,
+			lastEval?.confidence != null
+				? `${Math.round(lastEval.confidence * 100)}% confidence`
+				: null,
+			totalSources > 0 ? `${totalSources} sources` : null
 		]
 			.filter(Boolean)
 			.join(' · ')
 	);
+
+	function confidenceColor(c: number): string {
+		if (c >= 0.85) return 'text-teal-400';
+		if (c >= 0.6) return 'text-amber-400';
+		return 'text-red-400';
+	}
+
+	function confidenceBarWidth(c: number): string {
+		return `${Math.round(c * 100)}%`;
+	}
 </script>
 
 <div
@@ -191,6 +217,22 @@
 									<path d="M12 16v-4M12 8h.01" />
 								</svg>
 							</div>
+						{:else if step.type === 'complete'}
+							<div
+								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15 border border-teal-500/30"
+							>
+								<svg
+									class="h-3.5 w-3.5 text-teal-400"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2.5"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M20 6L9 17l-5-5" />
+								</svg>
+							</div>
 						{:else if step.type === 'synthesis_start'}
 							<div
 								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/15 border border-indigo-500/30"
@@ -214,12 +256,12 @@
 						<!-- Step content -->
 						<div class="min-w-0 max-w-full flex-1 overflow-hidden pt-0.5 break-words [overflow-wrap:anywhere]">
 							{#if step.type === 'plan'}
-								<p class="mb-1 text-xs font-semibold text-violet-300">Planning research</p>
+								<p class="mb-1 text-xs font-semibold text-violet-300">Research plan</p>
 								{#if step.strategy}
 									<p class="mb-2 text-xs text-slate-400">{step.strategy}</p>
 								{/if}
 								{#if step.subQueries && step.subQueries.length > 0}
-									<div class="flex flex-wrap gap-1.5">
+									<div class="mb-2 flex flex-wrap gap-1.5">
 										{#each step.subQueries as q (q)}
 											<span
 												class="max-w-full rounded-full border border-violet-500/20 bg-violet-500/10 px-2.5 py-0.5 text-[11px] leading-snug text-violet-300 break-words [overflow-wrap:anywhere]"
@@ -227,16 +269,27 @@
 										{/each}
 									</div>
 								{/if}
+								{#if step.stopCriteria && step.stopCriteria.length > 0}
+									<div class="mt-1.5 rounded-lg border border-chat-border bg-chat-surface/50 px-2.5 py-2">
+										<p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Completion checklist</p>
+										<ul class="flex flex-col gap-0.5">
+											{#each step.stopCriteria as c (c)}
+												<li class="flex items-start gap-1.5 text-[11px] text-slate-400">
+													<span class="mt-0.5 flex-shrink-0 text-slate-600">○</span>
+													<span class="break-words [overflow-wrap:anywhere]">{c}</span>
+												</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
 							{:else if step.type === 'iteration_start'}
 								<div class="flex flex-wrap items-center gap-2">
 									<p class="text-xs font-semibold text-indigo-300">
-										Iteration {step.iteration ?? '?'}{step.maxIterations
-											? `/${step.maxIterations}`
-											: ''}
+										Round {step.iteration ?? '?'}/{step.maxIterations ?? 7}
 									</p>
-									<span
-										class="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-indigo-500/20 text-[10px] font-bold text-indigo-300 px-1"
-									>{step.iteration}</span>
+									{#if step.totalUrlsFetched != null}
+										<span class="text-[10px] text-slate-500">{step.totalUrlsFetched} pages fetched</span>
+									{/if}
 								</div>
 							{:else if step.type === 'searching'}
 								<div class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
@@ -292,15 +345,52 @@
 									</ul>
 								{/if}
 							{:else if step.type === 'evaluation'}
+								{#if step.confidence != null}
+									<div class="mb-2 flex items-center gap-2">
+										<div class="h-1.5 flex-1 rounded-full bg-chat-border">
+											<div
+												class="h-full rounded-full transition-all {step.confidence >= 0.85
+													? 'bg-teal-400'
+													: step.confidence >= 0.6
+														? 'bg-amber-400'
+														: 'bg-red-400'}"
+												style="width: {confidenceBarWidth(step.confidence)}"
+											></div>
+										</div>
+										<span class="flex-shrink-0 text-[11px] font-semibold {confidenceColor(step.confidence)}">
+											{Math.round(step.confidence * 100)}%
+										</span>
+									</div>
+								{/if}
 								{#if step.thought}
-									<p class="mb-1 text-xs leading-relaxed text-slate-400 break-words [overflow-wrap:anywhere]">
+									<p class="mb-1.5 text-xs leading-relaxed text-slate-400 break-words [overflow-wrap:anywhere]">
 										{step.thought}
 									</p>
 								{/if}
+								{#if step.resolvedItems && step.resolvedItems.length > 0}
+									<div class="mb-1 flex flex-col gap-0.5">
+										{#each step.resolvedItems as item (item)}
+											<div class="flex items-start gap-1 text-[11px] text-teal-400">
+												<span class="flex-shrink-0">✓</span>
+												<span class="break-words [overflow-wrap:anywhere]">{item}</span>
+											</div>
+										{/each}
+									</div>
+								{/if}
+								{#if step.unresolvedItems && step.unresolvedItems.length > 0}
+									<div class="mb-1 flex flex-col gap-0.5">
+										{#each step.unresolvedItems as item (item)}
+											<div class="flex items-start gap-1 text-[11px] text-amber-400/80">
+												<span class="flex-shrink-0">○</span>
+												<span class="break-words [overflow-wrap:anywhere]">{item}</span>
+											</div>
+										{/each}
+									</div>
+								{/if}
 								{#if step.needsMore}
-									<div class="flex min-w-0 flex-wrap items-center gap-1.5">
+									<div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
 										<span class="flex-shrink-0 text-xs text-amber-400">→</span>
-										<span class="flex-shrink-0 text-xs text-amber-300">Refining search</span>
+										<span class="flex-shrink-0 text-xs text-amber-300">Searching further</span>
 										{#if step.refinedQueries && step.refinedQueries.length > 0}
 											<span class="min-w-0 text-xs text-slate-500 break-words [overflow-wrap:anywhere]">
 												· {step.refinedQueries[0]}
@@ -308,11 +398,27 @@
 										{/if}
 									</div>
 								{:else}
-									<div class="flex items-center gap-1.5">
-										<span class="text-teal-400 text-xs">✓</span>
+									<div class="mt-1 flex items-center gap-1.5">
+										<span class="text-xs text-teal-400">✓</span>
 										<span class="text-xs text-teal-300">Sufficient information gathered</span>
 									</div>
 								{/if}
+							{:else if step.type === 'complete'}
+								<div class="rounded-lg border border-teal-500/20 bg-teal-500/5 px-2.5 py-2">
+									<div class="flex items-center justify-between gap-2">
+										<p class="text-[11px] font-semibold text-teal-300">Research complete</p>
+										{#if step.confidence != null}
+											<span class="text-[11px] font-bold {confidenceColor(step.confidence)}">
+												{Math.round(step.confidence * 100)}% confident
+											</span>
+										{/if}
+									</div>
+									{#if step.stopReason}
+										<p class="mt-0.5 text-[10px] text-slate-500 break-words [overflow-wrap:anywhere]">
+											{step.stopReason}
+										</p>
+									{/if}
+								</div>
 							{:else if step.type === 'synthesis_start'}
 								<div class="flex items-center gap-2">
 									<p class="text-xs font-semibold text-indigo-300">

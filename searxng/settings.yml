@@ -1,0 +1,74 @@
+# SearXNG settings for local-llm-chatbot
+# Docs: https://docs.searxng.org/admin/settings/settings.html
+
+use_default_settings: true
+
+general:
+  instance_name: "local-llm-chatbot search"
+  debug: false
+
+server:
+  secret_key: "local-llm-chatbot-f7x2k9p1m3n8q4r6s0t5v"
+  bind_address: "0.0.0.0:8080"
+  limiter: false
+  image_proxy: false
+
+search:
+  # Enable JSON output format (disabled by default — this is the critical setting)
+  formats:
+    - html
+    - json
+  # Return up to 10 results per engine call
+  max_page: 1
+  default_lang: "auto"
+  safe_search: 0
+
+# Engine weights — higher = more preferred in aggregation ranking
+engines:
+  - name: google
+    disabled: false
+    weight: 2.0
+
+  - name: bing
+    disabled: false
+    weight: 1.5
+
+  - name: duckduckgo
+    disabled: false
+    weight: 1.0
+
+  - name: brave
+    disabled: false
+    weight: 1.5
+
+  - name: wikipedia
+    disabled: false
+    weight: 0.8
+
+  - name: reddit
+    disabled: false
+    weight: 0.5
+
+  # Disable noisy/slow engines for programmatic use
+  - name: google news
+    disabled: true
+  - name: bing news
+    disabled: true
+  - name: yahoo news
+    disabled: true
+  - name: qwant
+    disabled: true
+
+ui:
+  # Minimal UI — we only use the JSON API
+  static_use_hash: true
+  infinite_scroll: false
+  default_theme: simple
+
+outgoing:
+  # Conservative timeouts — each engine has 3s
+  request_timeout: 3.0
+  max_request_timeout: 8.0
+  useragent_suffix: ""
+  pool_connections: 100
+  pool_maxsize: 20

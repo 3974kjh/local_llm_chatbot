@@ -33,25 +33,39 @@ export interface StreamEvent {
 }
 
 export interface DeepSearchStep {
-	type: 'plan' | 'iteration_start' | 'searching' | 'sources' | 'evaluation' | 'synthesis_start';
+	type: 'plan' | 'iteration_start' | 'searching' | 'sources' | 'evaluation' | 'synthesis_start' | 'complete';
+	// plan
 	subQueries?: string[];
 	strategy?: string;
+	subQuestions?: string[];
+	stopCriteria?: string[];
+	// iteration_start
 	iteration?: number;
 	maxIterations?: number;
+	/** Total URLs fetched so far at this point */
+	totalUrlsFetched?: number;
+	// searching / sources
 	query?: string;
 	results?: SearchResult[];
+	// evaluation
 	thought?: string;
 	needsMore?: boolean;
 	refinedQueries?: string[];
+	confidence?: number;
+	resolvedItems?: string[];
+	unresolvedItems?: string[];
+	// complete (stop summary)
+	stopReason?: string;
 }
 
 export type DeepSearchEvent =
-	| { type: 'plan'; subQueries: string[]; strategy: string }
-	| { type: 'iteration_start'; iteration: number; maxIterations: number }
+	| { type: 'plan'; subQueries: string[]; strategy: string; subQuestions: string[]; stopCriteria: string[] }
+	| { type: 'iteration_start'; iteration: number; maxIterations: number; totalUrlsFetched: number }
 	| { type: 'searching'; query: string }
 	| { type: 'sources'; results: SearchResult[]; query: string }
-	| { type: 'evaluation'; thought: string; needsMore: boolean; refinedQueries?: string[] }
+	| { type: 'evaluation'; thought: string; needsMore: boolean; refinedQueries?: string[]; confidence: number; resolvedItems: string[]; unresolvedItems: string[] }
 	| { type: 'synthesis_start' }
+	| { type: 'complete'; stopReason: string; confidence: number }
 	| { type: 'token'; content: string }
 	| { type: 'done' }
 	| { type: 'error'; message: string };

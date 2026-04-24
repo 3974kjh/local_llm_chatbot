@@ -133,10 +133,10 @@ export async function streamDeepSearch(
 					const data = JSON.parse(line.slice(6));
 					switch (data.type) {
 						case 'plan':
-							callbacks.onStep({ type: 'plan', subQueries: data.subQueries, strategy: data.strategy });
+							callbacks.onStep({ type: 'plan', subQueries: data.subQueries, strategy: data.strategy, subQuestions: data.subQuestions, stopCriteria: data.stopCriteria });
 							break;
 						case 'iteration_start':
-							callbacks.onStep({ type: 'iteration_start', iteration: data.iteration, maxIterations: data.maxIterations });
+							callbacks.onStep({ type: 'iteration_start', iteration: data.iteration, maxIterations: data.maxIterations, totalUrlsFetched: data.totalUrlsFetched });
 							break;
 						case 'searching':
 							callbacks.onStep({ type: 'searching', query: data.query });
@@ -145,7 +145,10 @@ export async function streamDeepSearch(
 							callbacks.onStep({ type: 'sources', results: data.results, query: data.query });
 							break;
 						case 'evaluation':
-							callbacks.onStep({ type: 'evaluation', thought: data.thought, needsMore: data.needsMore, refinedQueries: data.refinedQueries });
+							callbacks.onStep({ type: 'evaluation', thought: data.thought, needsMore: data.needsMore, refinedQueries: data.refinedQueries, confidence: data.confidence, resolvedItems: data.resolvedItems, unresolvedItems: data.unresolvedItems });
+							break;
+						case 'complete':
+							callbacks.onStep({ type: 'complete', stopReason: data.stopReason, confidence: data.confidence });
 							break;
 						case 'synthesis_start':
 							callbacks.onStep({ type: 'synthesis_start' });

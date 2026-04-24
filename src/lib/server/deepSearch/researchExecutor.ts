@@ -9,11 +9,63 @@ export interface ResearchResult {
 	pageContents: Array<{ url: string; content: string }>;
 }
 
-const MAX_URLS_PER_QUERY = 2;
-const MAX_SEED_URLS = 5;
+const MAX_PAGE_CHARS = 5000;
 const MAX_SEED_PAGE_CHARS = 8000;
+const MAX_SEED_URLS = 5;
 
-/** Fetch and extract text from user-provided URLs before web search iterations. */
+// ---------------------------------------------------------------------------
+// Web search + page fetch (used per query in the research loop)
+// ---------------------------------------------------------------------------
+
+export async function executeResearch(
+	query: string,
+	seenUrls: Set<string>,
+	urlsPerQuery: number,
+	signal?: AbortSignal
+): Promise<ResearchResult> {
+	console.log(`[ResearchExecutor] Searching: "${query}"`);
+
+	// Fetch more candidate results so we have enough after filtering seen URLs
+	const allResults = await searchWeb(query, signal, urlsPerQuery * 3);
+
+	// Deduplicate: prefer unseen URLs, then fill with seen if needed
+	const fresh = allResults.filter((r) => !seenUrls.has(r.url));
+	const results = fresh.slice(0, urlsPerQuery);
+
+	// Mark as seen
+	for (const r of results) seenUrls.add(r.url);
+
+	const pageContents: Array<{ url: string; content: string }> = [];
+
+	if (results.length > 0) {
+		const fetched = await Promise.allSettled(
+			results.map(async (r) => {
+				try {
+					const content = await fetchUrlContent(r.url, signal);
+					return { url: r.url, content };
+				} catch {
+					return { url: r.url, content: '' };
+				}
+			})
+		);
+
+		for (const r of fetched) {
+			if (r.status === 'fulfilled' && r.value.content.length > 100) {
+				pageContents.push({
+					url: r.value.url,
+					content: r.value.content.slice(0, MAX_PAGE_CHARS)
+				});
+			}
+		}
+	}
+
+	return { query, results, pageContents };
+}
+
+// ---------------------------------------------------------------------------
+// Seed URL fetch (user-attached URLs, fetched before planning)
+// ---------------------------------------------------------------------------
+
 export async function executeSeedUrlResearch(
 	urls: string[],
 	signal?: AbortSignal
@@ -59,11 +111,7 @@ export async function executeSeedUrlResearch(
 		}
 	}
 
-	return {
-		query: 'User-attached URLs (prioritized)',
-		results,
-		pageContents
-	};
+	return { query: 'User-attached URLs (prioritized)', results, pageContents };
 }
 
 function pageTitleFromUrl(url: string): string {
@@ -74,40 +122,11 @@ function pageTitleFromUrl(url: string): string {
 	}
 }
 
-export async function executeResearch(
-	query: string,
-	signal?: AbortSignal
-): Promise<ResearchResult> {
-	console.log(`[ResearchExecutor] Searching: "${query}"`);
-	const results = await searchWeb(query, signal);
-
-	const topUrls = results.slice(0, MAX_URLS_PER_QUERY).map((r) => r.url);
-	const pageContents: Array<{ url: string; content: string }> = [];
-
-	if (topUrls.length > 0) {
-		const fetched = await Promise.allSettled(
-			topUrls.map(async (url) => {
-				try {
-					const content = await fetchUrlContent(url, signal);
-					return { url, content };
-				} catch {
-					return { url, content: '' };
-				}
-			})
-		);
-
-		for (const r of fetched) {
-			if (r.status === 'fulfilled' && r.value.content.length > 100) {
-				pageContents.push({ url: r.value.url, content: r.value.content.slice(0, 4000) });
-			}
-		}
-	}
-
-	return { query, results, pageContents };
-}
+// ---------------------------------------------------------------------------
+// Research context builder
+// ---------------------------------------------------------------------------
 
 export function buildResearchContext(iterations: ResearchResult[]): string {
-	// Collect all unique sources across iterations for the LLM reference
 	const allSources: Array<{ title: string; url: string }> = [];
 	const seenUrls = new Set<string>();
 
@@ -116,11 +135,6 @@ export function buildResearchContext(iterations: ResearchResult[]): string {
 			if (!seenUrls.has(r.url)) {
 				seenUrls.add(r.url);
 				allSources.push({ title: r.title, url: r.url });
-			}
-		}
-		for (const p of iter.pageContents) {
-			if (!seenUrls.has(p.url)) {
-				seenUrls.add(p.url);
 			}
 		}
 	}

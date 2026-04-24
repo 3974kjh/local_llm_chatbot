@@ -193,14 +193,14 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			BUDGET.confidenceThreshold
 		);
 
-		lastConfidence = evaluation.confidence;
+		lastConfidence = evaluation.confidence ?? lastConfidence;
 
 		enqueue({
 			type: 'evaluation',
 			thought: evaluation.thought,
 			needsMore: evaluation.needsMore,
 			refinedQueries: evaluation.nextQueries,
-			confidence: evaluation.confidence,
+			...(evaluation.confidence != null ? { confidence: evaluation.confidence } : {}),
 			resolvedItems: evaluation.resolvedItems,
 			unresolvedItems: evaluation.unresolvedItems
 		});
@@ -208,6 +208,7 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 		// --- Stop conditions (do not early-exit before minRounds unless URL budget hit above) ---
 		if (
 			round >= BUDGET.minRounds &&
+			evaluation.confidence != null &&
 			evaluation.confidence >= BUDGET.confidenceThreshold &&
 			evaluation.unresolvedItems.length === 0
 		) {
@@ -220,7 +221,12 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 			!evaluation.needsMore || evaluation.nextQueries.length === 0;
 
 		if (round >= BUDGET.minRounds && evaluatorWouldStop) {
-			stopReason = `Evaluator satisfied at round ${round} (confidence ${Math.round(evaluation.confidence * 100)}%)`;
+			const pct =
+				evaluation.confidence != null ? Math.round(evaluation.confidence * 100) : null;
+			stopReason =
+				pct != null
+					? `Evaluator satisfied at round ${round} (confidence ${pct}%)`
+					: `Evaluator satisfied at round ${round}`;
 			console.log(`[DeepSearch] ${stopReason}`);
 			break;
 		}

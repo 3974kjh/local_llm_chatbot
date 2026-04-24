@@ -1,3 +1,4 @@
+import { extractFirstJsonObject } from '../extractJsonObject';
 import { callOllamaNonStreaming } from '../ollama';
 
 export interface EvaluationResult {
@@ -5,8 +6,8 @@ export interface EvaluationResult {
 	resolvedItems: string[];
 	unresolvedItems: string[];
 	nextQueries: string[];
-	/** 0.0 – 1.0: estimated completeness of the research */
-	confidence: number;
+	/** Set when parsing succeeds; omitted on total failure fallback. */
+	confidence?: number;
 	needsMore: boolean;
 }
 
@@ -32,6 +33,46 @@ Output format:
 }`;
 }
 
+function parseEvaluationFromRaw(
+	raw: string,
+	previousQueries: string[],
+	confidenceThreshold: number
+): EvaluationResult {
+	const jsonStr = extractFirstJsonObject(raw);
+	if (!jsonStr) throw new Error('No JSON object in evaluator response');
+
+	const parsed = JSON.parse(jsonStr) as Partial<EvaluationResult>;
+
+	const resolvedItems = Array.isArray(parsed.resolvedItems)
+		? parsed.resolvedItems.filter((s) => typeof s === 'string' && s.trim())
+		: [];
+	const unresolvedItems = Array.isArray(parsed.unresolvedItems)
+		? parsed.unresolvedItems.filter((s) => typeof s === 'string' && s.trim())
+		: [];
+	const nextQueries = Array.isArray(parsed.nextQueries)
+		? parsed.nextQueries
+				.filter((q) => typeof q === 'string' && q.trim())
+				.filter((q) => !previousQueries.some((prev) => prev.toLowerCase() === q.toLowerCase()))
+				.slice(0, 3)
+		: [];
+
+	const rawConfidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
+	const confidence = Math.max(0, Math.min(1, rawConfidence));
+
+	const needsMore =
+		(typeof parsed.needsMore === 'boolean' ? parsed.needsMore : confidence < confidenceThreshold) &&
+		nextQueries.length > 0;
+
+	return {
+		thought: typeof parsed.thought === 'string' ? parsed.thought : 'Evaluation complete',
+		resolvedItems,
+		unresolvedItems,
+		nextQueries,
+		confidence,
+		needsMore
+	};
+}
+
 export async function evaluateResearch(
 	userQuery: string,
 	stopCriteria: string[],
@@ -42,7 +83,6 @@ export async function evaluateResearch(
 	maxRounds: number,
 	confidenceThreshold: number
 ): Promise<EvaluationResult> {
-	// Hierarchical context: always include full source index, truncate page content
 	const contextForEval = buildEvalContext(accumulatedContext);
 
 	const userMessage = `User Question: ${userQuery}
@@ -58,78 +98,50 @@ ${contextForEval}
 
 Evaluate completeness and return JSON.`;
 
-	try {
-		const raw = await callOllamaNonStreaming(
-			[{ role: 'user', content: userMessage }],
-			buildEvaluatorSystemPrompt(minRounds, maxRounds, confidenceThreshold)
-		);
+	const systemPrompt = buildEvaluatorSystemPrompt(minRounds, maxRounds, confidenceThreshold);
 
-		const jsonMatch = raw.match(/\{[\s\S]*\}/);
-		if (!jsonMatch) throw new Error('No JSON in evaluator response');
-
-		const parsed = JSON.parse(jsonMatch[0]) as Partial<EvaluationResult>;
-
-		const resolvedItems = Array.isArray(parsed.resolvedItems)
-			? parsed.resolvedItems.filter((s) => typeof s === 'string' && s.trim())
-			: [];
-		const unresolvedItems = Array.isArray(parsed.unresolvedItems)
-			? parsed.unresolvedItems.filter((s) => typeof s === 'string' && s.trim())
-			: [];
-		const nextQueries = Array.isArray(parsed.nextQueries)
-			? parsed.nextQueries
-					.filter((q) => typeof q === 'string' && q.trim())
-					.filter((q) => !previousQueries.some((prev) => prev.toLowerCase() === q.toLowerCase()))
-					.slice(0, 3)
-			: [];
-
-		const rawConfidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
-		const confidence = Math.max(0, Math.min(1, rawConfidence));
-
-		const needsMore =
-			(typeof parsed.needsMore === 'boolean' ? parsed.needsMore : confidence < confidenceThreshold) &&
-			nextQueries.length > 0;
-
-		return {
-			thought: typeof parsed.thought === 'string' ? parsed.thought : 'Evaluation complete',
-			resolvedItems,
-			unresolvedItems,
-			nextQueries,
-			confidence,
-			needsMore
-		};
-	} catch (err) {
-		console.error('[IterationEvaluator] Failed:', err);
-		return {
-			thought: 'Evaluation failed — proceeding with available research.',
-			resolvedItems: [],
-			unresolvedItems: stopCriteria,
-			nextQueries: [],
-			confidence: 0.4,
-			needsMore: false
-		};
+	let lastErr: unknown;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			const suffix =
+				attempt > 0
+					? '\n\nCRITICAL: Your previous reply was not valid JSON. Output exactly ONE JSON object with keys thought, resolvedItems, unresolvedItems, nextQueries, confidence, needsMore. No markdown fences, no text before or after the JSON.'
+					: '';
+			const raw = await callOllamaNonStreaming(
+				[{ role: 'user', content: userMessage + suffix }],
+				systemPrompt,
+				{ numPredict: 2048 }
+			);
+			return parseEvaluationFromRaw(raw, previousQueries, confidenceThreshold);
+		} catch (e) {
+			lastErr = e;
+			console.warn(`[IterationEvaluator] attempt ${attempt + 1}/3 failed:`, e);
+		}
 	}
+
+	console.error('[IterationEvaluator] Failed after retries:', lastErr);
+	return {
+		thought: 'Evaluation failed — proceeding with available research.',
+		resolvedItems: [],
+		unresolvedItems: stopCriteria,
+		nextQueries: [],
+		needsMore: false
+	};
 }
 
-/**
- * Build an evaluation-friendly context string.
- * Keeps the full source URL index (critical for citation accuracy) but trims
- * per-page body text to avoid exceeding the model context window.
- */
 function buildEvalContext(raw: string): string {
-	// Split at the boundary between the source index and iteration blocks
 	const iterBoundary = raw.indexOf('=== Research Iteration');
 	if (iterBoundary === -1) return raw.slice(0, 8000);
 
 	const sourceIndex = raw.slice(0, iterBoundary);
 	const iterBlocks = raw.slice(iterBoundary);
 
-	// Truncate each "Detailed Page Content" section to 800 chars to save tokens
 	const trimmedBlocks = iterBlocks.replace(
 		/(Detailed Page Content:\n)([\s\S]*?)(?=\n===|$)/g,
-		(_, label, body) => label + body.slice(0, 1600) + (body.length > 1600 ? '\n...[trimmed]' : '')
+		(_, label: string, body: string) =>
+			label + body.slice(0, 1600) + (body.length > 1600 ? '\n...[trimmed]' : '')
 	);
 
 	const combined = sourceIndex + trimmedBlocks;
-	// Hard cap: 9k chars so the full prompt + JSON output fits in an 8k-token model
 	return combined.length > 9000 ? combined.slice(0, 9000) + '\n...[truncated]' : combined;
 }

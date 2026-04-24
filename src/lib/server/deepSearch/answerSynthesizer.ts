@@ -1,3 +1,4 @@
+import { extractFirstJsonObject } from '../extractJsonObject';
 import {
 	createOllamaStream,
 	isOllamaTimeoutError,
@@ -38,10 +39,10 @@ interface OutlineSection {
 }
 
 function parseOutlineSections(raw: string): OutlineSection[] {
-	const jsonMatch = raw.match(/\{[\s\S]*\}/);
-	if (!jsonMatch) return [];
+	const jsonStr = extractFirstJsonObject(raw);
+	if (!jsonStr) return [];
 	try {
-		const parsed = JSON.parse(jsonMatch[0]) as { sections?: unknown };
+		const parsed = JSON.parse(jsonStr) as { sections?: unknown };
 		if (!Array.isArray(parsed.sections)) return [];
 		const out: OutlineSection[] = [];
 		for (const s of parsed.sections) {
@@ -156,18 +157,24 @@ export async function synthesizeAnswer(
 ): Promise<void> {
 	try {
 		const researchForOutline = researchContext.slice(0, 12000);
-		const outlineRaw = await callOllamaNonStreaming(
-			[
-				{
-					role: 'user',
-					content: `User question:\n${userQuery}\n\nResearch excerpt for planning (may be truncated):\n${researchForOutline}`
-				}
-			],
-			OUTLINE_SYSTEM_PROMPT,
-			{ numPredict: 1536 }
-		);
+		let outlineRaw = '';
+		try {
+			outlineRaw = await callOllamaNonStreaming(
+				[
+					{
+						role: 'user',
+						content: `User question:\n${userQuery}\n\nResearch excerpt for planning (may be truncated):\n${researchForOutline}`
+					}
+				],
+				OUTLINE_SYSTEM_PROMPT,
+				{ numPredict: 1536 }
+			);
+		} catch (outlineErr) {
+			console.warn('[answerSynthesizer] Outline request failed, using single-pass synthesis:', outlineErr);
+			outlineRaw = '';
+		}
 
-		const sections = parseOutlineSections(outlineRaw);
+		const sections = parseOutlineSections(outlineRaw).slice(0, 5);
 
 		if (sections.length < 2) {
 			await streamSinglePassSynthesis(

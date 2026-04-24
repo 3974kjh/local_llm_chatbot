@@ -63,7 +63,15 @@ export type DeepSearchEvent =
 	| { type: 'iteration_start'; iteration: number; maxIterations: number; totalUrlsFetched: number }
 	| { type: 'searching'; query: string }
 	| { type: 'sources'; results: SearchResult[]; query: string }
-	| { type: 'evaluation'; thought: string; needsMore: boolean; refinedQueries?: string[]; confidence: number; resolvedItems: string[]; unresolvedItems: string[] }
+	| {
+			type: 'evaluation';
+			thought: string;
+			needsMore: boolean;
+			refinedQueries?: string[];
+			confidence?: number;
+			resolvedItems: string[];
+			unresolvedItems: string[];
+		}
 	| { type: 'synthesis_start' }
 	| { type: 'complete'; stopReason: string; confidence: number }
 	| { type: 'token'; content: string }

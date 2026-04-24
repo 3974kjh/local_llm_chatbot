@@ -1,3 +1,4 @@
+import { extractFirstJsonObject } from '../extractJsonObject';
 import { callOllamaNonStreaming } from '../ollama';
 
 export interface QueryPlan {
@@ -45,10 +46,10 @@ Generate a research plan as JSON.`;
 			PLANNER_SYSTEM_PROMPT
 		);
 
-		const jsonMatch = raw.match(/\{[\s\S]*\}/);
-		if (!jsonMatch) throw new Error('No JSON in planner response');
+		const jsonStr = extractFirstJsonObject(raw);
+		if (!jsonStr) throw new Error('No JSON in planner response');
 
-		const parsed = JSON.parse(jsonMatch[0]) as Partial<QueryPlan>;
+		const parsed = JSON.parse(jsonStr) as Partial<QueryPlan>;
 
 		const subQueries = Array.isArray(parsed.subQueries)
 			? parsed.subQueries.filter((q) => typeof q === 'string' && q.trim()).slice(0, 4)

@@ -68,12 +68,19 @@ export function isOllamaTimeoutError(error: unknown): boolean {
 	return false;
 }
 
-/** 논스트리밍 채팅: JSON 응답이 필요한 플래너/평가자용 (30초 타임아웃) */
-const NON_STREAM_TIMEOUT_MS = 30_000;
+/** 논스트리밍: 플래너/평가자/아웃라인 등 (기본 10분, env로 조절) */
+const DEFAULT_NON_STREAM_TIMEOUT_MS = 600_000;
+
+function nonStreamTimeoutMs(explicit?: number): number {
+	if (explicit != null && explicit > 0) return explicit;
+	return readEnvInt(env.OLLAMA_NON_STREAM_TIMEOUT_MS, DEFAULT_NON_STREAM_TIMEOUT_MS);
+}
 
 export interface CallOllamaNonStreamingOptions {
 	/** Max tokens to generate (planner/evaluator/outline). */
 	numPredict?: number;
+	/** Axios timeout for this request (ms). Overrides env default. */
+	timeoutMs?: number;
 }
 
 export async function callOllamaNonStreaming(
@@ -99,7 +106,7 @@ export async function callOllamaNonStreaming(
 	}
 
 	const response = await axios.post(`${OLLAMA_URL}/api/chat`, body, {
-		timeout: NON_STREAM_TIMEOUT_MS
+		timeout: nonStreamTimeoutMs(options?.timeoutMs)
 	});
 
 	return response.data?.message?.content ?? '';

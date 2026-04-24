@@ -254,6 +254,12 @@ class ChatStore {
 						c.messages[assistantIdx].content += token;
 					}
 				},
+				onSynthesisFinal: (content) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].content = content;
+					}
+				},
 				onDone: () => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {

@@ -76,5 +76,7 @@ export type DeepSearchEvent =
 	| { type: 'keepalive' }
 	| { type: 'complete'; stopReason: string; confidence: number }
 	| { type: 'token'; content: string }
+	/** Full markdown replacement after server-side citation finalize (deep search only). */
+	| { type: 'synthesis_final'; content: string }
 	| { type: 'done' }
 	| { type: 'error'; message: string };

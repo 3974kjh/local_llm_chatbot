@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Message } from '$lib/types';
 	import MarkdownRenderer from './MarkdownRenderer.svelte';
+	import DeepSearchMarkdownRenderer from './DeepSearchMarkdownRenderer.svelte';
 	import SourceCard from './SourceCard.svelte';
 	import ThinkingIndicator from './ThinkingIndicator.svelte';
 	import BotAvatar from './BotAvatar.svelte';
@@ -85,6 +86,12 @@
 						</div>
 					{/if}
 					<p class="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+				{:else if isDeepSearch}
+					<DeepSearchMarkdownRenderer content={message.content} />
+					{#if message.isStreaming}
+						<span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-violet-400"
+						></span>
+					{/if}
 				{:else}
 					<MarkdownRenderer content={message.content} />
 					{#if message.isStreaming}

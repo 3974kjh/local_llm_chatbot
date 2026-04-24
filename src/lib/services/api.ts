@@ -11,6 +11,8 @@ export interface StreamCallbacks {
 export interface DeepSearchCallbacks {
 	onStep: (step: DeepSearchStep) => void;
 	onToken: (token: string) => void;
+	/** When set, called with full markdown to replace streamed synthesis (citation finalize). */
+	onSynthesisFinal?: (content: string) => void;
 	onDone: () => void;
 	onError: (message: string) => void;
 }
@@ -171,6 +173,9 @@ export async function streamDeepSearch(
 						case 'token':
 							callbacks.onToken(data.content);
 							break;
+						case 'synthesis_final':
+							callbacks.onSynthesisFinal?.(data.content);
+							break;
 						case 'done':
 							callbacks.onDone();
 							break;
@@ -189,6 +194,7 @@ export async function streamDeepSearch(
 				const data = JSON.parse(buffer.trim().slice(6));
 				if (data.type === 'done') callbacks.onDone();
 				if (data.type === 'error') callbacks.onError(data.message);
+				if (data.type === 'synthesis_final') callbacks.onSynthesisFinal?.(data.content);
 			} catch {
 				// skip
 			}

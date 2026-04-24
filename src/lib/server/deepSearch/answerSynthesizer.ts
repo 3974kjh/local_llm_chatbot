@@ -7,6 +7,7 @@ import {
 } from '../ollama';
 import { RESPONSE_LANGUAGE_KO, WEB_FIRST_GROUNDING } from '../promptLocale';
 import type { AxiosResponse } from 'axios';
+import { finalizeDeepSearchSynthesis } from './citationSanitizer';
 
 const SYNTHESIZER_SYSTEM_PROMPT = `${RESPONSE_LANGUAGE_KO}
 
@@ -22,7 +23,7 @@ GUIDELINES:
 - Do NOT use markdown tables. Prefer bullets with quoted figures and a markdown link on the same or next line.
 - Open with a short "### 데이터 시점" (or "### 근거 시점") section in Korean: list which dates or "as of" phrases actually appear in the research for key figures. If the research is stale vs the user's question date, say so clearly in Korean.
 - Use markdown formatting for clarity (headers, bullet points, code blocks where appropriate)
-- At the very end, add a "## 참고 자료" section listing all referenced URLs as a numbered markdown list: \`1. [제목](URL)\`. Do not list "homepage" names without URLs.
+- Do NOT add a "## 참고 자료" or "## References" section — the system appends a verified reference list after you finish.
 - If certain aspects couldn't be fully researched, acknowledge this honestly in Korean
 - Aim for depth: multiple sections with clear headings, substantial paragraphs, and synthesis across sources (not a short summary unless the evidence is genuinely thin)
 - For markets (stocks, indices, valuation): tie claims to PER/PBR or other metrics only when those metrics appear in the research; otherwise state which metrics are missing from the sources (in Korean).`;
@@ -41,7 +42,7 @@ RULES:
 - Every "title" and "focus" string must be in Korean
 - Titles must be unique and specific
 - Each section "focus" must demand evidence from the research only (no invented statistics)
-- Do not include an outline of the 참고 자료 section — the writer adds "## 참고 자료" at the end`;
+- Do not include an outline of a references / 참고 자료 section — the system appends it automatically`;
 
 interface OutlineSection {
 	title: string;
@@ -136,6 +137,18 @@ async function pipeOllamaChatStream(
 	});
 }
 
+function emitSynthesisFinalizeAndDone(
+	rawStreamedMarkdown: string,
+	researchContext: string,
+	enqueue: (data: Record<string, unknown>) => void
+): void {
+	const { text } = finalizeDeepSearchSynthesis(rawStreamedMarkdown, researchContext);
+	if (text !== rawStreamedMarkdown) {
+		enqueue({ type: 'synthesis_final', content: text });
+	}
+	enqueue({ type: 'done' });
+}
+
 async function streamSinglePassSynthesis(
 	userQuery: string,
 	researchContext: string,
@@ -157,8 +170,12 @@ ${researchContext}
 		{ role: 'user', content: userQuery }
 	];
 
+	let accumulated = '';
 	const response = await createOllamaStream(messages, systemPrompt, { streamKind });
-	await pipeOllamaChatStream(response, enqueue, true, undefined);
+	await pipeOllamaChatStream(response, enqueue, false, (t) => {
+		accumulated += t;
+	});
+	emitSynthesisFinalizeAndDone(accumulated, researchContext, enqueue);
 }
 
 export async function synthesizeAnswer(
@@ -240,31 +257,7 @@ You are writing ONE section of a longer Korean report (part ${i + 1} of ${sectio
 			}
 		}
 
-		const draftTail = draftAccum.trim().slice(-14000);
-		const sourcesUser = `아래는 사용자에게 이미 보여 준 보고서 초안이다. 초안 본문은 수정하지 않는다.
-
----DRAFT---
-${draftTail}
----END---
-
-마크다운 섹션 하나만 출력한다. 제목은 반드시 "## 참고 자료"로 시작한다. 초안에 마크다운 링크 형태로 등장한 서로 다른 http(s) URL을 번호 목록으로 모두 적는다. URL이 없으면 한 줄로 초안에 마크다운 링크 URL이 없었다고 한국어로 적는다.`;
-
-		const sourcesSystem = `${SYNTHESIZER_SYSTEM_PROMPT}
-
-**Current Date:** ${currentDate}
-
-=== RESEARCH GATHERED (for resolving link titles if needed) ===
-${researchContext.slice(0, 8000)}
-=== END RESEARCH ===
-
-사용자 지시를 정확히 따른다. "## 참고 자료" 섹션만 출력한다.`;
-
-		const sourcesResponse = await createOllamaStream(
-			[...conversationHistory, { role: 'user', content: sourcesUser }],
-			sourcesSystem,
-			{ streamKind: 'synthesis' }
-		);
-		await pipeOllamaChatStream(sourcesResponse, enqueue, true, undefined);
+		emitSynthesisFinalizeAndDone(draftAccum, researchContext, enqueue);
 	} catch (error: unknown) {
 		let msg = '답변 합성에 실패했습니다.';
 		if (isOllamaTimeoutError(error)) {

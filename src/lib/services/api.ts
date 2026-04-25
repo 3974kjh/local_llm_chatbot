@@ -107,7 +107,8 @@ export async function streamDeepSearch(
 	currentDate: string,
 	callbacks: DeepSearchCallbacks,
 	signal?: AbortSignal,
-	seedUrls?: string[]
+	seedUrls?: string[],
+	preset?: string
 ): Promise<void> {
 	try {
 		const response = await fetch('/api/deep-search', {
@@ -118,7 +119,8 @@ export async function streamDeepSearch(
 				query,
 				currentDate,
 				localeCalendarDate: getLocalCalendarDateYYYYMMDD(),
-				seedUrls: seedUrls ?? []
+				seedUrls: seedUrls ?? [],
+				...(preset ? { preset } : {})
 			}),
 			signal
 		});
@@ -150,10 +152,25 @@ export async function streamDeepSearch(
 						case 'keepalive':
 							break;
 						case 'plan':
-							callbacks.onStep({ type: 'plan', subQueries: data.subQueries, strategy: data.strategy, subQuestions: data.subQuestions, stopCriteria: data.stopCriteria });
+							callbacks.onStep({
+								type: 'plan',
+								subQueries: data.subQueries,
+								strategy: data.strategy,
+								subQuestions: data.subQuestions,
+								stopCriteria: data.stopCriteria,
+								...(data.preset ? { preset: data.preset } : {})
+							});
 							break;
 						case 'iteration_start':
-							callbacks.onStep({ type: 'iteration_start', iteration: data.iteration, maxIterations: data.maxIterations, totalUrlsFetched: data.totalUrlsFetched });
+							callbacks.onStep({
+								type: 'iteration_start',
+								iteration: data.iteration,
+								maxIterations: data.maxIterations,
+								totalUrlsFetched: data.totalUrlsFetched,
+								...(data.confidenceThreshold != null
+									? { confidenceThreshold: data.confidenceThreshold }
+									: {})
+							});
 							break;
 						case 'searching':
 							callbacks.onStep({ type: 'searching', query: data.query });

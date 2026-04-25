@@ -3,7 +3,8 @@ import { runDeepSearch } from '$lib/server/deepSearch';
 import { resolveSearchCalendarDate } from '$lib/server/searchDate';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { messages, query, currentDate, seedUrls, localeCalendarDate } = await request.json();
+	const { messages, query, currentDate, seedUrls, localeCalendarDate, preset } =
+		await request.json();
 
 	const encoder = new TextEncoder();
 	const abortController = new AbortController();
@@ -29,7 +30,8 @@ export const POST: RequestHandler = async ({ request }) => {
 						typeof localeCalendarDate === 'string' ? localeCalendarDate : undefined,
 					enqueue,
 					signal: abortController.signal,
-					seedUrls: Array.isArray(seedUrls) ? seedUrls : undefined
+					seedUrls: Array.isArray(seedUrls) ? seedUrls : undefined,
+					preset: typeof preset === 'string' ? preset : undefined
 				});
 			} catch (error: unknown) {
 				const msg = error instanceof Error ? error.message : 'Deep search failed';

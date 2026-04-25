@@ -1,5 +1,12 @@
 <script lang="ts">
 	import { chatStore } from '$lib/stores/chat.svelte';
+	import type { DeepSearchPresetId } from '$lib/types';
+
+	const presetOptions: { id: DeepSearchPresetId; label: string; short: string }[] = [
+		{ id: 'fast', label: 'Fast', short: 'Fewer pages & rounds' },
+		{ id: 'balanced', label: 'Balanced', short: 'Default depth' },
+		{ id: 'deep', label: 'Deep', short: 'More pages & rounds' }
+	];
 
 	let inputValue = $state('');
 	let seedUrlInput = $state('');
@@ -85,6 +92,31 @@
 		>
 			{#if chatStore.deepSearchEnabled}
 				<div class="border-b border-chat-border px-4 pb-2 pt-3">
+					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+						Research depth
+					</p>
+					<div
+						class="mb-3 flex min-w-0 flex-wrap gap-1 rounded-lg border border-chat-border bg-chat-surface/80 p-0.5"
+						role="group"
+						aria-label="Deep research depth"
+					>
+						{#each presetOptions as opt (opt.id)}
+							<button
+								type="button"
+								disabled={chatStore.isGenerating}
+								onclick={() => {
+									chatStore.deepSearchPreset = opt.id;
+								}}
+								title={opt.short}
+								class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-center text-[11px] font-medium transition-all sm:flex-none sm:px-3 {chatStore.deepSearchPreset ===
+								opt.id
+									? 'bg-violet-600/90 text-white shadow-sm'
+									: 'text-slate-400 hover:bg-chat-raised hover:text-slate-200'}"
+							>
+								{opt.label}
+							</button>
+						{/each}
+					</div>
 					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
 						Attach pages (optional, analyzed first)
 					</p>

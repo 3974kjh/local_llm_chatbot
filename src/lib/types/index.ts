@@ -32,6 +32,8 @@ export interface StreamEvent {
 	message?: string;
 }
 
+export type DeepSearchPresetId = 'fast' | 'balanced' | 'deep';
+
 export interface DeepSearchStep {
 	type: 'plan' | 'iteration_start' | 'searching' | 'sources' | 'evaluation' | 'synthesis_start' | 'complete';
 	// plan
@@ -39,11 +41,15 @@ export interface DeepSearchStep {
 	strategy?: string;
 	subQuestions?: string[];
 	stopCriteria?: string[];
+	/** Resolved server-side depth preset for this run */
+	preset?: DeepSearchPresetId;
 	// iteration_start
 	iteration?: number;
 	maxIterations?: number;
 	/** Total URLs fetched so far at this point */
 	totalUrlsFetched?: number;
+	/** Target confidence for this run (from preset); UI uses for bar coloring */
+	confidenceThreshold?: number;
 	// searching / sources
 	query?: string;
 	results?: SearchResult[];
@@ -59,8 +65,21 @@ export interface DeepSearchStep {
 }
 
 export type DeepSearchEvent =
-	| { type: 'plan'; subQueries: string[]; strategy: string; subQuestions: string[]; stopCriteria: string[] }
-	| { type: 'iteration_start'; iteration: number; maxIterations: number; totalUrlsFetched: number }
+	| {
+			type: 'plan';
+			subQueries: string[];
+			strategy: string;
+			subQuestions: string[];
+			stopCriteria: string[];
+			preset?: DeepSearchPresetId;
+		}
+	| {
+			type: 'iteration_start';
+			iteration: number;
+			maxIterations: number;
+			totalUrlsFetched: number;
+			confidenceThreshold?: number;
+		}
 	| { type: 'searching'; query: string }
 	| { type: 'sources'; results: SearchResult[]; query: string }
 	| {

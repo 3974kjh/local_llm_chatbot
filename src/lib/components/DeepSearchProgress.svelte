@@ -31,6 +31,20 @@
 
 	const completeStep = $derived(steps.find((s) => s.type === 'complete'));
 
+	/** From latest iteration_start (preset-aware); falls back to balanced default. */
+	const evalConfidenceThreshold = $derived(
+		[...steps].reverse().find((s) => s.type === 'iteration_start')?.confidenceThreshold ??
+			DEEP_SEARCH_BUDGET.confidenceThreshold
+	);
+
+	const planPresetLabel = $derived.by(() => {
+		const p = steps.find((s) => s.type === 'plan')?.preset;
+		if (p === 'fast') return 'Fast';
+		if (p === 'deep') return 'Deep';
+		if (p === 'balanced') return 'Balanced';
+		return null;
+	});
+
 	const latestUrlCount = $derived(
 		(() => {
 			const last = [...steps].reverse().find((s) => s.type === 'iteration_start');
@@ -51,9 +65,9 @@
 			.join(' · ')
 	);
 
-	function confidenceColor(c: number): string {
-		if (c >= DEEP_SEARCH_BUDGET.confidenceThreshold) return 'text-teal-400';
-		if (c >= 0.6) return 'text-amber-400';
+	function confidenceColor(c: number, threshold: number): string {
+		if (c >= threshold) return 'text-teal-400';
+		if (c >= 0.55) return 'text-amber-400';
 		return 'text-red-400';
 	}
 
@@ -263,6 +277,11 @@
 						<div class="min-w-0 max-w-full flex-1 overflow-hidden pt-0.5 break-words [overflow-wrap:anywhere]">
 							{#if step.type === 'plan'}
 								<p class="mb-1 text-xs font-semibold text-violet-300">Research plan</p>
+								{#if planPresetLabel}
+									<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+										Depth: <span class="text-violet-300">{planPresetLabel}</span>
+									</p>
+								{/if}
 								{#if step.strategy}
 									<p class="mb-2 text-xs text-slate-400">{step.strategy}</p>
 								{/if}
@@ -355,15 +374,21 @@
 									<div class="mb-2 flex items-center gap-2">
 										<div class="h-1.5 flex-1 rounded-full bg-chat-border">
 											<div
-												class="h-full rounded-full transition-all {step.confidence >= 0.85
+												class="h-full rounded-full transition-all {step.confidence >=
+												evalConfidenceThreshold
 													? 'bg-teal-400'
-													: step.confidence >= 0.6
+													: step.confidence >= 0.55
 														? 'bg-amber-400'
 														: 'bg-red-400'}"
 												style="width: {confidenceBarWidth(step.confidence)}"
 											></div>
 										</div>
-										<span class="flex-shrink-0 text-[11px] font-semibold {confidenceColor(step.confidence)}">
+										<span
+											class="flex-shrink-0 text-[11px] font-semibold {confidenceColor(
+												step.confidence,
+												evalConfidenceThreshold
+											)}"
+										>
 											{Math.round(step.confidence * 100)}%
 										</span>
 									</div>
@@ -414,7 +439,12 @@
 									<div class="flex items-center justify-between gap-2">
 										<p class="text-[11px] font-semibold text-teal-300">Research complete</p>
 										{#if step.confidence != null}
-											<span class="text-[11px] font-bold {confidenceColor(step.confidence)}">
+											<span
+												class="text-[11px] font-bold {confidenceColor(
+													step.confidence,
+													evalConfidenceThreshold
+												)}"
+											>
 												{Math.round(step.confidence * 100)}% confident
 											</span>
 										{/if}

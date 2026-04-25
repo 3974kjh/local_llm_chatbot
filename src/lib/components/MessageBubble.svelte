@@ -12,9 +12,13 @@
 
 	const isUser = $derived(message.role === 'user');
 	const isDeepSearch = $derived(!!message.isDeepSearch);
-	const hasSources = $derived(!isDeepSearch && !!message.searchResults && message.searchResults.length > 0);
+	const sourceResults = $derived(message.searchResults ?? []);
+	const hasAnySources = $derived(!isUser && sourceResults.length > 0);
+	/** Non-deep: always show strip; deep: many hits → collapsible list */
+	const collapsibleDeepSources = $derived(isDeepSearch && sourceResults.length > 8);
 
 	let copied = $state(false);
+	let deepSourcesExpanded = $state(false);
 	let copyTimeout: ReturnType<typeof setTimeout>;
 
 	async function copyContent() {
@@ -52,12 +56,38 @@
 		>
 			{#if isDeepSearch && message.deepSearchSteps && message.deepSearchSteps.length > 0}
 				<DeepSearchProgress steps={message.deepSearchSteps ?? []} isStreaming={!!message.isStreaming} />
-			{:else if hasSources}
-				<div class="mb-2 flex flex-wrap gap-2">
-					{#each message.searchResults! as result (result.url)}
-						<SourceCard {result} />
-					{/each}
-				</div>
+			{/if}
+
+			{#if hasAnySources}
+				{#if collapsibleDeepSources}
+					<div class="mb-2 w-full min-w-0 max-w-full">
+						<button
+							type="button"
+							onclick={() => (deepSourcesExpanded = !deepSourcesExpanded)}
+							class="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-chat-border bg-chat-raised px-3 py-2 text-left text-[11px] font-medium text-slate-300 transition-colors hover:bg-chat-surface"
+						>
+							<span>Consulted pages ({sourceResults.length})</span>
+							<span class="text-slate-500">{deepSourcesExpanded ? 'Hide' : 'Show'}</span>
+						</button>
+						{#if deepSourcesExpanded}
+							<div
+								class="mt-2 max-h-72 overflow-y-auto rounded-lg border border-chat-border bg-chat-surface/40 p-2"
+							>
+								<div class="flex flex-wrap gap-2">
+									{#each sourceResults as result (result.url)}
+										<SourceCard {result} />
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<div class="mb-2 flex max-h-72 flex-wrap gap-2 overflow-y-auto">
+						{#each sourceResults as result (result.url)}
+							<SourceCard {result} />
+						{/each}
+					</div>
+				{/if}
 			{/if}
 
 			<div
@@ -66,7 +96,9 @@
 					: 'rounded-tl-sm border border-chat-border bg-chat-surface text-slate-200'}"
 			>
 				{#if message.isStreaming && !message.content}
-					<ThinkingIndicator label={isDeepSearch ? 'Deep researching' : hasSources ? 'Analyzing sources' : 'Thinking'} />
+					<ThinkingIndicator
+						label={isDeepSearch ? 'Deep researching' : hasAnySources ? 'Analyzing sources' : 'Thinking'}
+					/>
 				{:else if isUser}
 					{#if message.attachedSeedUrls && message.attachedSeedUrls.length > 0}
 						<div class="mb-2 flex w-full min-w-0 flex-col gap-1.5 border-b border-white/15 pb-2">

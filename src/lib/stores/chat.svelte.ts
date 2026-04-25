@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { Conversation, Message } from '$lib/types';
+import type { Conversation, DeepSearchPresetId, Message } from '$lib/types';
 import { streamChat, streamDeepSearch } from '$lib/services/api';
 import { generateId, getCurrentDateContext, normalizeHttpUrl } from '$lib/utils/helpers';
 import { getItem, setItem } from '$lib/db';
@@ -12,6 +12,8 @@ class ChatStore {
 	isGenerating = $state(false);
 	searchEnabled = $state(true);
 	deepSearchEnabled = $state(false);
+	/** Depth for the next deep-research request (server default: balanced). */
+	deepSearchPreset: DeepSearchPresetId = $state('balanced');
 	/** URLs to fetch before web search when sending a deep-research message. */
 	deepSearchSeedUrls = $state<string[]>([]);
 	sidebarOpen = $state(true);
@@ -241,10 +243,18 @@ class ChatStore {
 						}
 						c.messages[assistantIdx].deepSearchSteps!.push(step);
 
-						// Collect all sources across iterations for the SourceCard display
+						// Collect sources (dedupe by URL) for SourceCard strip on the answer bubble
 						if (step.type === 'sources' && step.results) {
 							const existing = c.messages[assistantIdx].searchResults ?? [];
-							c.messages[assistantIdx].searchResults = [...existing, ...step.results];
+							const seen = new Set(existing.map((r) => r.url));
+							const merged = [...existing];
+							for (const r of step.results) {
+								if (!seen.has(r.url)) {
+									seen.add(r.url);
+									merged.push(r);
+								}
+							}
+							c.messages[assistantIdx].searchResults = merged;
 						}
 					}
 				},
@@ -284,7 +294,8 @@ class ChatStore {
 				}
 			},
 			this.abortController.signal,
-			seeds
+			seeds,
+			this.deepSearchPreset
 		);
 	}
 

@@ -1,4 +1,4 @@
-import { DEEP_SEARCH_BUDGET } from '$lib/deepSearchBudget';
+import { getDeepSearchBudget, resolveDeepSearchPreset } from '$lib/deepSearchBudget';
 import { resolveSearchCalendarDate } from '../searchDate';
 import type { OllamaMessage } from '../ollama';
 import { planQuery } from './queryPlanner';
@@ -9,8 +9,6 @@ import {
 } from './researchExecutor';
 import { evaluateResearch } from './iterationEvaluator';
 import { synthesizeAnswer } from './answerSynthesizer';
-
-const BUDGET = DEEP_SEARCH_BUDGET;
 
 function buildFallbackQueries(
 	userQuery: string,
@@ -45,6 +43,8 @@ export interface DeepSearchOptions {
 	enqueue: (data: Record<string, unknown>) => void;
 	signal?: AbortSignal;
 	seedUrls?: string[];
+	/** Research depth: fast | balanced | deep */
+	preset?: string | null;
 }
 
 export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
@@ -74,6 +74,8 @@ async function runDeepSearchImpl(
 	calendarDate: string
 ): Promise<void> {
 	const { messages, userQuery, currentDate, enqueue, signal, seedUrls } = options;
+	const resolvedPreset = resolveDeepSearchPreset(options.preset);
+	const BUDGET = getDeepSearchBudget(options.preset);
 
 	const conversationContext =
 		messages.length > 2
@@ -136,7 +138,8 @@ async function runDeepSearchImpl(
 		subQueries: plan.subQueries,
 		strategy: plan.strategy,
 		subQuestions: plan.subQuestions,
-		stopCriteria: plan.stopCriteria
+		stopCriteria: plan.stopCriteria,
+		preset: resolvedPreset
 	});
 
 	if (signal?.aborted) return;
@@ -163,7 +166,8 @@ async function runDeepSearchImpl(
 			type: 'iteration_start',
 			iteration: round,
 			maxIterations: BUDGET.maxRounds,
-			totalUrlsFetched
+			totalUrlsFetched,
+			confidenceThreshold: BUDGET.confidenceThreshold
 		});
 
 		// Announce queries

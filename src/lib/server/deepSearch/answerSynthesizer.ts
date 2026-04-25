@@ -8,6 +8,13 @@ import {
 import { RESPONSE_LANGUAGE_KO, WEB_FIRST_GROUNDING } from '../promptLocale';
 import type { AxiosResponse } from 'axios';
 import { finalizeDeepSearchSynthesis } from './citationSanitizer';
+import {
+	analyzeResearchChunks,
+	buildChunkAnalysisContext,
+	buildResearchChunks,
+	type CollectedText,
+	type DeepSearchSynthesisMode
+} from './chunkPipeline';
 
 const SYNTHESIZER_SYSTEM_PROMPT = `${RESPONSE_LANGUAGE_KO}
 
@@ -188,9 +195,48 @@ export async function synthesizeAnswer(
 	researchContext: string,
 	conversationHistory: OllamaMessage[],
 	currentDate: string,
-	enqueue: (data: Record<string, unknown>) => void
+	enqueue: (data: Record<string, unknown>) => void,
+	options?: {
+		collectedTexts?: CollectedText[];
+		synthesisMode?: DeepSearchSynthesisMode;
+	}
 ): Promise<void> {
 	try {
+		const synthesisMode = options?.synthesisMode ?? 'hybrid';
+		if (synthesisMode === 'raw-only') {
+			enqueue({ type: 'done' });
+			return;
+		}
+
+		const collectedTexts = options?.collectedTexts ?? [];
+		const shouldChunkAnalyze =
+			(synthesisMode === 'hybrid' || synthesisMode === 'chunked') &&
+			collectedTexts.length > 0;
+
+		if (shouldChunkAnalyze) {
+			const chunks = buildResearchChunks(collectedTexts, {
+				targetChars: synthesisMode === 'chunked' ? 2600 : 3200,
+				hardMaxChars: synthesisMode === 'chunked' ? 3600 : 4200
+			});
+			const analyses = await analyzeResearchChunks(chunks, userQuery, currentDate);
+			const chunkContext = buildChunkAnalysisContext(analyses);
+			if (chunkContext) {
+				const compactContext = `${chunkContext}
+
+=== ORIGINAL RESEARCH (TRIMMED) ===
+${researchContext.slice(0, 6000)}`;
+				await streamSinglePassSynthesis(
+					userQuery,
+					compactContext,
+					conversationHistory,
+					currentDate,
+					enqueue,
+					'synthesis'
+				);
+				return;
+			}
+		}
+
 		const researchForOutline = researchContext.slice(0, 16000);
 		let outlineRaw = '';
 		try {

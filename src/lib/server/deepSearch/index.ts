@@ -9,6 +9,11 @@ import {
 } from './researchExecutor';
 import { evaluateResearch } from './iterationEvaluator';
 import { synthesizeAnswer } from './answerSynthesizer';
+import {
+	buildCollectedTextsMarkdown,
+	type CollectedText,
+	type DeepSearchSynthesisMode
+} from './chunkPipeline';
 
 function buildFallbackQueries(
 	userQuery: string,
@@ -45,6 +50,8 @@ export interface DeepSearchOptions {
 	seedUrls?: string[];
 	/** Research depth: fast | balanced | deep */
 	preset?: string | null;
+	/** Synthesis mode: hybrid | chunked | raw-only */
+	synthesisMode?: DeepSearchSynthesisMode | string | null;
 }
 
 export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
@@ -76,6 +83,7 @@ async function runDeepSearchImpl(
 	const { messages, userQuery, currentDate, enqueue, signal, seedUrls } = options;
 	const resolvedPreset = resolveDeepSearchPreset(options.preset);
 	const BUDGET = getDeepSearchBudget(options.preset);
+	const resolvedSynthesisMode = resolveSynthesisMode(options.synthesisMode);
 
 	const conversationContext =
 		messages.length > 2
@@ -297,38 +305,50 @@ async function runDeepSearchImpl(
 	// ------------------------------------------------------------------
 	// Phase 2.5: Emit raw research findings (no LLM opinion)
 	// ------------------------------------------------------------------
-	const rawSources: { title: string; url: string; snippet: string }[] = [];
-	const emittedRawUrls = new Set<string>();
-	for (const iter of allIterations) {
+	const sourceMeta = new Map<string, { title: string; query: string; iteration: number }>();
+	for (let i = 0; i < allIterations.length; i++) {
+		const iter = allIterations[i];
 		for (const r of iter.results) {
-			if (!emittedRawUrls.has(r.url)) {
-				emittedRawUrls.add(r.url);
-				rawSources.push(r);
+			if (!sourceMeta.has(r.url)) {
+				sourceMeta.set(r.url, { title: r.title, query: iter.query, iteration: i + 1 });
 			}
 		}
 	}
-	if (rawSources.length > 0) {
-		const lines: string[] = [];
-		for (let i = 0; i < rawSources.length; i++) {
-			const r = rawSources[i];
-			lines.push(`**${i + 1}. [${r.title}](${r.url})**`);
-			if (r.snippet) lines.push(`> ${r.snippet}`);
-			lines.push('');
+
+	const collectedTexts: CollectedText[] = [];
+	for (let i = 0; i < allIterations.length; i++) {
+		const iter = allIterations[i];
+		for (const p of iter.pageContents) {
+			const meta = sourceMeta.get(p.url);
+			collectedTexts.push({
+				url: p.url,
+				title: meta?.title ?? p.url,
+				query: meta?.query ?? iter.query,
+				iteration: meta?.iteration ?? i + 1,
+				content: p.content
+			});
 		}
-		enqueue({ type: 'raw_answer', content: lines.join('\n').trim() });
+	}
+
+	if (collectedTexts.length > 0) {
+		enqueue({ type: 'raw_answer', content: buildCollectedTextsMarkdown(collectedTexts) });
 	}
 
 	// ------------------------------------------------------------------
 	// Phase 3: Synthesis
 	// ------------------------------------------------------------------
-	enqueue({ type: 'synthesis_start' });
+	if (resolvedSynthesisMode !== 'raw-only') {
+		enqueue({ type: 'synthesis_start' });
+	}
 
 	const finalContext = buildResearchContext(allIterations);
-	await synthesizeAnswer(
-		userQuery,
-		finalContext,
-		messages.slice(-10),
-		currentDate,
-		enqueue
-	);
+	await synthesizeAnswer(userQuery, finalContext, messages.slice(-10), currentDate, enqueue, {
+		collectedTexts,
+		synthesisMode: resolvedSynthesisMode
+	});
+}
+
+function resolveSynthesisMode(mode?: string | null): DeepSearchSynthesisMode {
+	if (mode === 'raw-only' || mode === 'chunked' || mode === 'hybrid') return mode;
+	return 'hybrid';
 }

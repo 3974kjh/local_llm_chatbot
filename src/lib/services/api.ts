@@ -1,4 +1,4 @@
-import type { DeepSearchStep, SearchResult } from '$lib/types';
+import type { DeepSearchStep, DeepSearchSynthesisModeId, SearchResult } from '$lib/types';
 import { getLocalCalendarDateYYYYMMDD } from '$lib/utils/helpers';
 
 export interface StreamCallbacks {
@@ -115,7 +115,8 @@ export async function streamDeepSearch(
 	callbacks: DeepSearchCallbacks,
 	signal?: AbortSignal,
 	seedUrls?: string[],
-	preset?: string
+	preset?: string,
+	synthesisMode: DeepSearchSynthesisModeId = 'hybrid'
 ): Promise<void> {
 	try {
 		const response = await fetch('/api/deep-search', {
@@ -127,7 +128,8 @@ export async function streamDeepSearch(
 				currentDate,
 				localeCalendarDate: getLocalCalendarDateYYYYMMDD(),
 				seedUrls: seedUrls ?? [],
-				...(preset ? { preset } : {})
+				...(preset ? { preset } : {}),
+				synthesisMode
 			}),
 			signal
 		});

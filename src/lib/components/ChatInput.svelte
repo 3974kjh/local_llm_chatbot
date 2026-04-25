@@ -1,11 +1,17 @@
 <script lang="ts">
 	import { chatStore } from '$lib/stores/chat.svelte';
-	import type { DeepSearchPresetId } from '$lib/types';
+	import type { DeepSearchPresetId, DeepSearchSynthesisModeId } from '$lib/types';
 
 	const presetOptions: { id: DeepSearchPresetId; label: string; short: string }[] = [
 		{ id: 'fast', label: 'Fast', short: 'Fewer pages & rounds' },
 		{ id: 'balanced', label: 'Balanced', short: 'Default depth' },
 		{ id: 'deep', label: 'Deep', short: 'More pages & rounds' }
+	];
+
+	const synthesisModeOptions: { id: DeepSearchSynthesisModeId; label: string; short: string }[] = [
+		{ id: 'hybrid', label: 'Hybrid', short: 'Chunk map + final answer' },
+		{ id: 'chunked', label: 'Chunked', short: 'Smaller chunks, faster' },
+		{ id: 'raw-only', label: 'Raw only', short: 'Collected text only' }
 	];
 
 	let inputValue = $state('');
@@ -111,6 +117,31 @@
 								class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-center text-[11px] font-medium transition-all sm:flex-none sm:px-3 {chatStore.deepSearchPreset ===
 								opt.id
 									? 'bg-violet-600/90 text-white shadow-sm'
+									: 'text-slate-400 hover:bg-chat-raised hover:text-slate-200'}"
+							>
+								{opt.label}
+							</button>
+						{/each}
+					</div>
+					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+						Answer mode
+					</p>
+					<div
+						class="mb-3 flex min-w-0 flex-wrap gap-1 rounded-lg border border-chat-border bg-chat-surface/80 p-0.5"
+						role="group"
+						aria-label="Deep research answer mode"
+					>
+						{#each synthesisModeOptions as opt (opt.id)}
+							<button
+								type="button"
+								disabled={chatStore.isGenerating}
+								onclick={() => {
+									chatStore.deepSearchSynthesisMode = opt.id;
+								}}
+								title={opt.short}
+								class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-center text-[11px] font-medium transition-all sm:flex-none sm:px-3 {chatStore.deepSearchSynthesisMode ===
+								opt.id
+									? 'bg-sky-600/90 text-white shadow-sm'
 									: 'text-slate-400 hover:bg-chat-raised hover:text-slate-200'}"
 							>
 								{opt.label}

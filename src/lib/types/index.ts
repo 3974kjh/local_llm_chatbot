@@ -36,6 +36,9 @@ export interface StreamEvent {
 
 export type DeepSearchPresetId = 'fast' | 'balanced' | 'deep';
 
+/** How deep search builds the final answer from collected pages */
+export type DeepSearchSynthesisModeId = 'hybrid' | 'chunked' | 'raw-only';
+
 export interface DeepSearchStep {
 	type: 'plan' | 'iteration_start' | 'searching' | 'sources' | 'evaluation' | 'synthesis_start' | 'complete';
 	// plan

@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { Conversation, DeepSearchPresetId, Message } from '$lib/types';
+import type { Conversation, DeepSearchPresetId, DeepSearchSynthesisModeId, Message } from '$lib/types';
 import { streamChat, streamDeepSearch } from '$lib/services/api';
 import { generateId, getCurrentDateContext, normalizeHttpUrl } from '$lib/utils/helpers';
 import { getItem, setItem } from '$lib/db';
@@ -14,6 +14,8 @@ class ChatStore {
 	deepSearchEnabled = $state(false);
 	/** Depth for the next deep-research request (server default: balanced). */
 	deepSearchPreset: DeepSearchPresetId = $state('balanced');
+	/** Final-answer strategy for the next deep-research request (server default: hybrid). */
+	deepSearchSynthesisMode: DeepSearchSynthesisModeId = $state('hybrid');
 	/** URLs to fetch before web search when sending a deep-research message. */
 	deepSearchSeedUrls = $state<string[]>([]);
 	sidebarOpen = $state(true);
@@ -318,7 +320,8 @@ class ChatStore {
 			},
 			this.abortController.signal,
 			seeds,
-			this.deepSearchPreset
+			this.deepSearchPreset,
+			this.deepSearchSynthesisMode
 		);
 	}
 

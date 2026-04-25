@@ -18,6 +18,7 @@
 		const lastMsg = messages[messages.length - 1];
 		const _trackContent = lastMsg?.content;
 		const _trackStreaming = lastMsg?.isStreaming;
+		const _trackScrollSync = chatStore.scrollSyncEpoch;
 
 		requestAnimationFrame(scrollToBottom);
 	});

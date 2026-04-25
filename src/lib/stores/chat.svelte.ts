@@ -17,8 +17,14 @@ class ChatStore {
 	/** URLs to fetch before web search when sending a deep-research message. */
 	deepSearchSeedUrls = $state<string[]>([]);
 	sidebarOpen = $state(true);
+	/** Bumped on streaming deltas so MessageList can auto-scroll (plain `content +=` / step pushes may not invalidate derived deps). */
+	scrollSyncEpoch = $state(0);
 
 	private abortController: AbortController | null = null;
+
+	private bumpScrollSync() {
+		this.scrollSyncEpoch++;
+	}
 
 	constructor() {
 		if (browser) {
@@ -127,12 +133,14 @@ class ChatStore {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
 						c.messages[assistantIdx].content += token;
+						this.bumpScrollSync();
 					}
 				},
 				onSources: (sources) => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
 						c.messages[assistantIdx].searchResults = sources;
+						this.bumpScrollSync();
 					}
 				},
 				onDone: () => {
@@ -256,18 +264,21 @@ class ChatStore {
 							}
 							c.messages[assistantIdx].searchResults = merged;
 						}
+						this.bumpScrollSync();
 					}
 				},
 				onToken: (token) => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
 						c.messages[assistantIdx].content += token;
+						this.bumpScrollSync();
 					}
 				},
 				onSynthesisFinal: (content) => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
 						c.messages[assistantIdx].content = content;
+						this.bumpScrollSync();
 					}
 				},
 				onDone: () => {

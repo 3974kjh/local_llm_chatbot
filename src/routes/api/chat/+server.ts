@@ -99,6 +99,39 @@ ${CHAT_NO_SEARCH_KO}
 마크다운으로 가독성 있게 정리해도 된다.`;
 	}
 
+	function formatWebRawAnswer(
+		results: { title: string; url: string; snippet: string }[],
+		detail: string
+	): string {
+		const lines: string[] = [];
+		for (let i = 0; i < results.length; i++) {
+			const r = results[i];
+			lines.push(`**${i + 1}. [${r.title}](${r.url})**`);
+			if (r.snippet) lines.push(`> ${r.snippet}`);
+			lines.push('');
+		}
+		if (detail) {
+			const detailParts = detail
+				.split(/\[Detailed Source \d+: /)
+				.filter(Boolean)
+				.slice(0, 3);
+			for (const part of detailParts) {
+				const urlEnd = part.indexOf(']');
+				if (urlEnd === -1) continue;
+				const url = part.slice(0, urlEnd).trim();
+				const body = part.slice(urlEnd + 2, urlEnd + 2 + 800).trim();
+				if (body) {
+					lines.push(`**상세 내용 ([${url}](${url}))**`);
+					lines.push('```');
+					lines.push(body);
+					lines.push('```');
+					lines.push('');
+				}
+			}
+		}
+		return lines.join('\n').trim();
+	}
+
 	const stream = new ReadableStream({
 		async start(controller) {
 			const enqueue = (data: Record<string, unknown>) => {
@@ -107,6 +140,10 @@ ${CHAT_NO_SEARCH_KO}
 
 			if (searchResults.length > 0) {
 				enqueue({ type: 'sources', data: searchResults });
+				const rawMarkdown = formatWebRawAnswer(searchResults, detailContext);
+				if (rawMarkdown) {
+					enqueue({ type: 'raw_answer', content: rawMarkdown });
+				}
 			}
 
 			try {

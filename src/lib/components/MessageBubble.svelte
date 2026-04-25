@@ -6,6 +6,7 @@
 	import ThinkingIndicator from './ThinkingIndicator.svelte';
 	import BotAvatar from './BotAvatar.svelte';
 	import DeepSearchProgress from './DeepSearchProgress.svelte';
+	import RawAnswerBlock from './RawAnswerBlock.svelte';
 	import { formatTime } from '$lib/utils/helpers';
 
 	let { message }: { message: Message } = $props();
@@ -51,11 +52,13 @@
 		</div>
 
 		<!-- Content -->
-		<div
-			class="flex min-w-0 max-w-full flex-col {isUser ? 'items-end' : 'items-start'}"
-		>
+		<div class="flex min-w-0 max-w-full flex-col {isUser ? 'items-end' : 'items-start'}">
 			{#if isDeepSearch && message.deepSearchSteps && message.deepSearchSteps.length > 0}
 				<DeepSearchProgress steps={message.deepSearchSteps ?? []} isStreaming={!!message.isStreaming} />
+			{/if}
+
+			{#if !isUser && message.rawAnswer}
+				<RawAnswerBlock content={message.rawAnswer} {isDeepSearch} />
 			{/if}
 
 			{#if hasAnySources}
@@ -90,6 +93,15 @@
 				{/if}
 			{/if}
 
+			{#if !isUser && message.rawAnswer && (message.content || message.isStreaming)}
+				<div class="mb-1.5 flex items-center gap-1.5 px-0.5 text-[10px] font-medium text-violet-400/70">
+					<svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.347.384a1 1 0 01-.704.28H8.346a1 1 0 01-.704-.28l-.347-.384z" />
+					</svg>
+					AI 요약
+				</div>
+			{/if}
+
 			<div
 				class="rounded-2xl px-4 py-3 {isUser
 					? 'rounded-tr-sm bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-600/15'
@@ -121,14 +133,12 @@
 				{:else if isDeepSearch}
 					<DeepSearchMarkdownRenderer content={message.content} />
 					{#if message.isStreaming}
-						<span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-violet-400"
-						></span>
+						<span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-violet-400"></span>
 					{/if}
 				{:else}
 					<MarkdownRenderer content={message.content} />
 					{#if message.isStreaming}
-						<span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-violet-400"
-						></span>
+						<span class="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-violet-400"></span>
 					{/if}
 				{/if}
 			</div>

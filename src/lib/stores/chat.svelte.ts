@@ -136,6 +136,12 @@ class ChatStore {
 						this.bumpScrollSync();
 					}
 				},
+				onRawAnswer: (content) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].rawAnswer = content;
+					}
+				},
 				onSources: (sources) => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
@@ -272,6 +278,12 @@ class ChatStore {
 					if (c && c.messages[assistantIdx]) {
 						c.messages[assistantIdx].content += token;
 						this.bumpScrollSync();
+					}
+				},
+				onRawAnswer: (content) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].rawAnswer = content;
 					}
 				},
 				onSynthesisFinal: (content) => {

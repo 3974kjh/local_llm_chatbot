@@ -4,6 +4,8 @@ import { getLocalCalendarDateYYYYMMDD } from '$lib/utils/helpers';
 export interface StreamCallbacks {
 	onToken: (token: string) => void;
 	onSources: (sources: SearchResult[]) => void;
+	/** Called once with formatted markdown of raw search results (no LLM opinion). */
+	onRawAnswer?: (content: string) => void;
 	onDone: () => void;
 	onError: (message: string) => void;
 }
@@ -11,6 +13,8 @@ export interface StreamCallbacks {
 export interface DeepSearchCallbacks {
 	onStep: (step: DeepSearchStep) => void;
 	onToken: (token: string) => void;
+	/** Called once with formatted markdown of raw research sources (no LLM opinion). */
+	onRawAnswer?: (content: string) => void;
 	/** When set, called with full markdown to replace streamed synthesis (citation finalize). */
 	onSynthesisFinal?: (content: string) => void;
 	onDone: () => void;
@@ -62,20 +66,23 @@ export async function streamChat(
 
 				try {
 					const data = JSON.parse(line.slice(6));
-					switch (data.type) {
-						case 'token':
-							callbacks.onToken(data.content);
-							break;
-						case 'sources':
-							callbacks.onSources(data.data);
-							break;
-						case 'done':
-							callbacks.onDone();
-							break;
-						case 'error':
-							callbacks.onError(data.message);
-							break;
-					}
+				switch (data.type) {
+					case 'token':
+						callbacks.onToken(data.content);
+						break;
+					case 'sources':
+						callbacks.onSources(data.data);
+						break;
+					case 'raw_answer':
+						callbacks.onRawAnswer?.(data.content);
+						break;
+					case 'done':
+						callbacks.onDone();
+						break;
+					case 'error':
+						callbacks.onError(data.message);
+						break;
+				}
 				} catch {
 					// skip malformed SSE data
 				}
@@ -184,15 +191,18 @@ export async function streamDeepSearch(
 						case 'complete':
 							callbacks.onStep({ type: 'complete', stopReason: data.stopReason, confidence: data.confidence });
 							break;
-						case 'synthesis_start':
-							callbacks.onStep({ type: 'synthesis_start' });
-							break;
-						case 'token':
-							callbacks.onToken(data.content);
-							break;
-						case 'synthesis_final':
-							callbacks.onSynthesisFinal?.(data.content);
-							break;
+					case 'synthesis_start':
+						callbacks.onStep({ type: 'synthesis_start' });
+						break;
+					case 'token':
+						callbacks.onToken(data.content);
+						break;
+					case 'raw_answer':
+						callbacks.onRawAnswer?.(data.content);
+						break;
+					case 'synthesis_final':
+						callbacks.onSynthesisFinal?.(data.content);
+						break;
 						case 'done':
 							callbacks.onDone();
 							break;

@@ -295,6 +295,30 @@ async function runDeepSearchImpl(
 	enqueue({ type: 'complete', stopReason, confidence: lastConfidence });
 
 	// ------------------------------------------------------------------
+	// Phase 2.5: Emit raw research findings (no LLM opinion)
+	// ------------------------------------------------------------------
+	const rawSources: { title: string; url: string; snippet: string }[] = [];
+	const emittedRawUrls = new Set<string>();
+	for (const iter of allIterations) {
+		for (const r of iter.results) {
+			if (!emittedRawUrls.has(r.url)) {
+				emittedRawUrls.add(r.url);
+				rawSources.push(r);
+			}
+		}
+	}
+	if (rawSources.length > 0) {
+		const lines: string[] = [];
+		for (let i = 0; i < rawSources.length; i++) {
+			const r = rawSources[i];
+			lines.push(`**${i + 1}. [${r.title}](${r.url})**`);
+			if (r.snippet) lines.push(`> ${r.snippet}`);
+			lines.push('');
+		}
+		enqueue({ type: 'raw_answer', content: lines.join('\n').trim() });
+	}
+
+	// ------------------------------------------------------------------
 	// Phase 3: Synthesis
 	// ------------------------------------------------------------------
 	enqueue({ type: 'synthesis_start' });

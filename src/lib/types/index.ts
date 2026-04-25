@@ -9,6 +9,8 @@ export interface Message {
 	isDeepSearch?: boolean;
 	/** URLs the user attached for a deep-search question (shown on the user bubble). */
 	attachedSeedUrls?: string[];
+	/** Formatted markdown of raw search results with no LLM opinion — displayed above the LLM synthesis. */
+	rawAnswer?: string;
 }
 
 export interface Conversation {

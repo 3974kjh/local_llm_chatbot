@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { AutoBundle, BundleFormData, ScheduleType } from '$lib/types/auto';
+	import type { LlmProvider } from '$lib/types';
 	import { autoStore } from '$lib/stores/auto.svelte';
 	import { telegramConfigsStore } from '$lib/stores/telegramConfigs.svelte';
+	import { LLM_PROVIDER_OPTIONS } from '$lib/stores/llm.svelte';
 	import MarkdownRenderer from '../MarkdownRenderer.svelte';
 
 	let {
@@ -20,6 +22,7 @@
 	let telegramEnabled = $state(false);
 	let telegramBotId = $state('');
 	let telegramChatId = $state('');
+	let llmProvider = $state<LlmProvider>('local');
 	let titleError = $state<string | null>(null);
 	let expandedHistoryIndex = $state(-1);
 
@@ -48,6 +51,7 @@
 			telegramEnabled = bundle.telegramEnabled ?? false;
 			telegramBotId = (bundle.telegramBotId ?? '').trim();
 			telegramChatId = (bundle.telegramChatId ?? '').trim();
+			llmProvider = bundle.llmProvider ?? 'local';
 			expandedHistoryIndex = -1;
 			if (scheduleType === 'minutes' && bundle.autoTimeSetting >= 1440 && bundle.autoTimeSetting % 1440 === 0) {
 				scheduleType = 'days';
@@ -68,6 +72,7 @@
 			telegramEnabled = false;
 			telegramBotId = '';
 			telegramChatId = '';
+			llmProvider = 'local';
 			expandedHistoryIndex = -1;
 		}
 	});
@@ -160,7 +165,8 @@
 		autoStore.executeBundle(bundle.id, {
 			telegramEnabled,
 			telegramBotId,
-			telegramChatId
+			telegramChatId,
+			llmProvider
 		});
 	}
 
@@ -177,7 +183,8 @@
 			enableWebSearch,
 			telegramEnabled,
 			telegramBotId: telegramBotId.trim(),
-			telegramChatId: telegramChatId.trim()
+			telegramChatId: telegramChatId.trim(),
+			llmProvider
 		};
 	}
 
@@ -327,6 +334,40 @@
 						/>
 					</div>
 				</div>
+			{/if}
+		</div>
+
+		<!-- Model -->
+		<div>
+			<p class="mb-2 text-xs font-medium text-slate-400">Model</p>
+			<div class="space-y-1.5 rounded-xl border border-chat-border bg-chat-bg/40 p-3">
+				{#each LLM_PROVIDER_OPTIONS as option (option.value)}
+					<label
+						class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-chat-raised/60 {llmProvider ===
+						option.value
+							? 'bg-chat-raised text-slate-200'
+							: 'text-slate-400'}"
+					>
+						<input
+							type="radio"
+							name="bundle-llm-provider"
+							value={option.value}
+							checked={llmProvider === option.value}
+							onchange={() => (llmProvider = option.value)}
+							disabled={settingsLocked}
+							class="accent-violet-500 disabled:opacity-50"
+						/>
+						<span class="flex-1">
+							<span class="font-medium">{option.label}</span>
+							<span class="text-slate-500"> — {option.model}</span>
+						</span>
+					</label>
+				{/each}
+			</div>
+			{#if llmProvider === 'omniroute'}
+				<p class="mt-2 rounded-lg bg-violet-500/5 px-3 py-2 text-[10px] leading-relaxed text-slate-500">
+					OpenRouter 연결 실패 또는 토큰 소진 시 Local 모델로 자동 전환됩니다.
+				</p>
 			{/if}
 		</div>
 

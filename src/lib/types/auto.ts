@@ -1,3 +1,5 @@
+import type { LlmProvider } from '$lib/types';
+
 export interface TelegramBotConfig {
 	id: string;
 	name: string;
@@ -35,6 +37,7 @@ export interface AutoBundle {
 	telegramEnabled: boolean;
 	telegramBotId: string;
 	telegramChatId: string;
+	llmProvider: LlmProvider;
 	isActive: boolean;
 	isExecuting: boolean;
 	lastExecutedAt: string | null;
@@ -56,6 +59,7 @@ export interface BundleFormData {
 	telegramEnabled: boolean;
 	telegramBotId: string;
 	telegramChatId: string;
+	llmProvider: LlmProvider;
 }
 
 export interface BundleExecutionResult {

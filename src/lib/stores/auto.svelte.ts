@@ -2,7 +2,12 @@ import { browser } from '$app/environment';
 import type { AutoBundle, BundleFormData, BundleStatus, ResultHistoryItem } from '$lib/types/auto';
 import { generateId } from '$lib/utils/helpers';
 import { telegramConfigsStore } from '$lib/stores/telegramConfigs.svelte';
+import type { LlmProvider } from '$lib/types';
 import { getItem, setItem } from '$lib/db';
+
+function normalizeBundleLlmProvider(raw: unknown): LlmProvider {
+	return raw === 'omniroute' ? 'omniroute' : 'local';
+}
 
 const STORAGE_KEY = 'jukimbot-auto-bundles';
 
@@ -69,6 +74,7 @@ class AutoStore {
 			telegramEnabled: data.telegramEnabled ?? false,
 			telegramBotId: (data.telegramBotId ?? '').trim(),
 			telegramChatId: (data.telegramChatId ?? '').trim(),
+			llmProvider: normalizeBundleLlmProvider(data.llmProvider),
 			isActive: false,
 			isExecuting: false,
 			lastExecutedAt: null,
@@ -103,6 +109,7 @@ class AutoStore {
 		bundle.telegramEnabled = data.telegramEnabled ?? false;
 		bundle.telegramBotId = (data.telegramBotId ?? '').trim();
 		bundle.telegramChatId = (data.telegramChatId ?? '').trim();
+		bundle.llmProvider = normalizeBundleLlmProvider(data.llmProvider);
 		bundle.updatedAt = new Date().toISOString();
 		this.persist();
 		return true;
@@ -157,10 +164,11 @@ class AutoStore {
 
 	async executeBundle(
 		id: string,
-		telegramOverrides?: {
+		overrides?: {
 			telegramEnabled?: boolean;
 			telegramBotId?: string;
 			telegramChatId?: string;
+			llmProvider?: LlmProvider;
 		}
 	) {
 		const bundle = this.bundles.find((b) => b.id === id);
@@ -171,14 +179,17 @@ class AutoStore {
 		bundle.isExecuting = true;
 
 		try {
-			const botId = telegramOverrides?.telegramBotId ?? bundle.telegramBotId;
-			const chatId = telegramOverrides?.telegramChatId ?? bundle.telegramChatId;
+			const botId = overrides?.telegramBotId ?? bundle.telegramBotId;
+			const chatId = overrides?.telegramChatId ?? bundle.telegramChatId;
 			const bot = botId ? telegramConfigsStore.getBotById(botId) : undefined;
 			const chat = chatId ? telegramConfigsStore.getChatById(chatId) : undefined;
 			const telegramEnabled =
-				telegramOverrides?.telegramEnabled !== undefined
-					? telegramOverrides.telegramEnabled
+				overrides?.telegramEnabled !== undefined
+					? overrides.telegramEnabled
 					: (bundle.telegramEnabled ?? false);
+			const llmProvider = normalizeBundleLlmProvider(
+				overrides?.llmProvider ?? bundle.llmProvider
+			);
 			const telegramBotToken = bot?.botToken ?? '';
 			const telegramChatIdVal = chat?.chatId ?? '';
 			if (telegramEnabled && (!telegramBotToken || !telegramChatIdVal)) {
@@ -204,7 +215,8 @@ class AutoStore {
 					enableWebSearch: bundle.enableWebSearch,
 					telegramEnabled,
 					telegramBotToken,
-					telegramChatId: telegramChatIdVal
+					telegramChatId: telegramChatIdVal,
+					llmProvider
 				}),
 				signal: controller.signal
 			});
@@ -264,7 +276,8 @@ class AutoStore {
 					enableWebSearch: bundle.enableWebSearch,
 					telegramEnabled: bundle.telegramEnabled ?? false,
 					telegramBotToken: bot?.botToken ?? '',
-					telegramChatId: chat?.chatId ?? ''
+					telegramChatId: chat?.chatId ?? '',
+					llmProvider: normalizeBundleLlmProvider(bundle.llmProvider)
 				})
 			});
 
@@ -460,6 +473,7 @@ class AutoStore {
 					telegramEnabled: b.telegramEnabled ?? false,
 					telegramBotId: String(b.telegramBotId ?? '').trim(),
 					telegramChatId: String(b.telegramChatId ?? '').trim(),
+					llmProvider: normalizeBundleLlmProvider(b.llmProvider),
 					resultHistory: Array.isArray(b.resultHistory) ? b.resultHistory : [],
 					isActive: false,
 					isExecuting: false

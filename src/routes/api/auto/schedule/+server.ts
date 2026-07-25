@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { startSchedule, stopSchedule, stopAllSchedules } from '$lib/server/scheduler';
+import { normalizeLlmProvider } from '$lib/server/llm';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json();
@@ -18,7 +19,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			enableWebSearch,
 			telegramEnabled,
 			telegramBotToken,
-			telegramChatId
+			telegramChatId,
+			llmProvider
 		} = body;
 
 		if (!id || !title || !autoApplyText) {
@@ -49,7 +51,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			(telegramChatId ?? '').trim(),
 			st,
 			(typeof scheduleTime === 'string' && scheduleTime) ? scheduleTime.trim() : '09:00',
-			Math.max(1, Math.min(365, Number(scheduleDays) || 1))
+			Math.max(1, Math.min(365, Number(scheduleDays) || 1)),
+			normalizeLlmProvider(llmProvider)
 		);
 		return json({ success: true });
 	}

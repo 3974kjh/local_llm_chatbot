@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { executeBundle, registerRunAbort, unregisterRunAbort } from '$lib/server/scheduler';
+import { normalizeLlmProvider } from '$lib/server/llm';
 
 export const POST: RequestHandler = async ({ request }) => {
 	let body: Record<string, unknown>;
@@ -18,7 +19,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		enableWebSearch,
 		telegramEnabled,
 		telegramBotToken: bodyToken,
-		telegramChatId: bodyChatId
+		telegramChatId: bodyChatId,
+		llmProvider
 	} = body;
 
 	const telegramBotToken = String(bodyToken ?? '').trim();
@@ -48,7 +50,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			!!telegramEnabled,
 			telegramBotToken,
 			telegramChatId,
-			signal
+			signal,
+			normalizeLlmProvider(llmProvider)
 		);
 		return json(result);
 	} finally {

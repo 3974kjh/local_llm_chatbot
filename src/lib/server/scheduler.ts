@@ -1,14 +1,15 @@
-import axios from 'axios';
 import { RESPONSE_LANGUAGE_KO, WEB_FIRST_GROUNDING } from './promptLocale';
 import { fetchMultipleUrls, fetchUrlContent } from './scraper';
 import { searchWeb, formatSearchContext } from './search';
 import { sendMessageChunked, isConnected as isKakaoConnected } from './kakao';
 import { sendMessageChunked as sendTelegramChunked } from './telegram';
-
-const OLLAMA_URL = 'http://localhost:11434';
-const MODEL = 'llama3.1:8b';
-/** Auto 실행 시 Ollama 응답 대기 (긴 프롬프트·느린 환경 대비, 10분) */
-const OLLAMA_REQUEST_TIMEOUT_MS = 600_000;
+import {
+	callLlmNonStreamingWithLocalFallback,
+	buildLlmFallbackNotice,
+	normalizeLlmProvider,
+	resolveDefaultLlmProvider,
+	type LlmProvider
+} from './llm';
 
 type ScheduleType = 'minutes' | 'daily' | 'days';
 
@@ -22,6 +23,7 @@ interface ScheduledTask {
 	telegramEnabled: boolean;
 	telegramBotToken: string;
 	telegramChatId: string;
+	llmProvider: LlmProvider;
 	scheduleType: ScheduleType;
 	scheduleTime: string;
 	scheduleDays: number;
@@ -38,8 +40,11 @@ const activeTasks = new Map<string, ScheduledTask>();
 
 const TICK_MS = 60 * 1000;
 
-/** 동일 시각에 여러 번들이 떠도 Ollama 동시 요청 수 제한 (GPU OOM·지연 방지) */
-const MAX_CONCURRENT_OLLAMA = 2;
+/** Auto 실행 시 LLM 응답 대기 (긴 프롬프트·느린 환경 대비, 10분) */
+const LLM_REQUEST_TIMEOUT_MS = 600_000;
+
+/** 동일 시각에 여러 번들이 떠도 LLM 동시 요청 수 제한 (GPU OOM·지연 방지) */
+const MAX_CONCURRENT_LLM = 2;
 
 function getRunningTaskCount(): number {
 	let n = 0;
@@ -71,7 +76,7 @@ function runTimeBasedTick(): void {
 		if (task.scheduleType !== 'daily' && task.scheduleType !== 'days') continue;
 		if (task.nextRunAt == null || task.isRunning) continue;
 		if (now < task.nextRunAt) continue;
-		if (getRunningTaskCount() >= MAX_CONCURRENT_OLLAMA) {
+		if (getRunningTaskCount() >= MAX_CONCURRENT_LLM) {
 			task.nextRunAt = now + 60_000;
 			console.log(`[Scheduler] Deferring "${task.title}" (scheduled-time): at concurrency limit, retry in 1min`);
 			continue;
@@ -144,14 +149,16 @@ export async function executeBundle(
 	telegramEnabled = false,
 	telegramBotToken = '',
 	telegramChatId = '',
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	llmProvider?: LlmProvider
 ): Promise<{ researchResultText: string; success: boolean; error?: string }> {
 	try {
+		const provider = llmProvider ?? resolveDefaultLlmProvider();
 		if (signal?.aborted) {
 			return { researchResultText: '', success: false, error: 'Cancelled' };
 		}
 		console.log(
-			`[Scheduler] Executing bundle "${title}" with ${autoReferUrl.length} URLs, webSearch=${enableWebSearch}, telegramEnabled=${telegramEnabled}, hasToken=${!!(telegramBotToken && telegramBotToken.trim())}, hasChatId=${!!(telegramChatId && telegramChatId.trim())}`
+			`[Scheduler] Executing bundle "${title}" with ${autoReferUrl.length} URLs, webSearch=${enableWebSearch}, telegramEnabled=${telegramEnabled}, hasToken=${!!(telegramBotToken && telegramBotToken.trim())}, hasChatId=${!!(telegramChatId && telegramChatId.trim())}, llmProvider=${provider}`
 		);
 
 		const urlResults = await fetchMultipleUrls(autoReferUrl, signal);
@@ -281,43 +288,26 @@ ${WEB_FIRST_GROUNDING}
 
 		userPrompt += `\n\n[지시]\n위 맥락만 사용해 사용자 요청에 맞게 답하세요. 단순 질문이면 한두 문장으로, 정리·요약 요청이면 맥락에서 인용해 정리하세요.`;
 
-		const ollamaPost = () =>
-			axios.post<{ message?: { content?: string } }>(
-				`${OLLAMA_URL}/api/chat`,
-				{
-					model: MODEL,
-					messages: [
-						{ role: 'system', content: systemPrompt },
-						{ role: 'user', content: userPrompt }
-					],
-					stream: false,
-					options: {
-						num_predict: 8192,
-						temperature: 0.1
-					}
-				},
-				{ timeout: OLLAMA_REQUEST_TIMEOUT_MS, ...(signal && { signal }) }
-			);
-
-		let ollamaResponse: Awaited<ReturnType<typeof ollamaPost>>;
-		try {
-			ollamaResponse = await ollamaPost();
-		} catch (firstError: unknown) {
-			const isTimeout =
-				firstError &&
-				typeof firstError === 'object' &&
-				'code' in firstError &&
-				(firstError as { code?: string }).code === 'ECONNABORTED';
-			if (isTimeout && !signal?.aborted) {
-				console.warn(`[Scheduler] Ollama timeout for "${title}", retrying once...`);
-				ollamaResponse = await ollamaPost();
-			} else {
-				throw firstError;
+		const llmResult = await callLlmNonStreamingWithLocalFallback(
+			[{ role: 'user', content: userPrompt }],
+			systemPrompt,
+			{
+				provider,
+				maxTokens: 8192,
+				temperature: 0.1,
+				timeoutMs: LLM_REQUEST_TIMEOUT_MS
 			}
+		);
+
+		let researchResultText = llmResult.text;
+		if (llmResult.usedFallback) {
+			console.warn(
+				`[Scheduler] LLM fallback: ${llmResult.primaryProvider} → local for bundle "${title}"`
+			);
+			researchResultText = buildLlmFallbackNotice(llmResult.primaryProvider) + researchResultText;
 		}
 
-		const researchResultText = ollamaResponse.data.message?.content || '';
-		console.log(`[Scheduler] Ollama returned ${researchResultText.length} chars`);
+		console.log(`[Scheduler] LLM returned ${researchResultText.length} chars`);
 
 		if (signal?.aborted) {
 			console.log(`[Scheduler] Bundle "${title}" aborted before send - skipping Kakao/Telegram`);
@@ -424,7 +414,9 @@ async function runTask(task: ScheduledTask, label: string): Promise<void> {
 			task.enableWebSearch,
 			task.telegramEnabled,
 			task.telegramBotToken,
-			task.telegramChatId
+			task.telegramChatId,
+			undefined,
+			task.llmProvider
 		);
 		task.lastResult = result.success ? result.researchResultText : `Error: ${result.error}`;
 		task.lastExecutedAt = new Date().toISOString();
@@ -456,7 +448,8 @@ export function startSchedule(
 	telegramChatId = '',
 	scheduleType: ScheduleType = 'minutes',
 	scheduleTime = '09:00',
-	scheduleDays = 1
+	scheduleDays = 1,
+	llmProvider: LlmProvider = resolveDefaultLlmProvider()
 ): void {
 	stopSchedule(id);
 
@@ -470,6 +463,7 @@ export function startSchedule(
 		telegramEnabled,
 		telegramBotToken: (telegramBotToken || '').trim(),
 		telegramChatId: (telegramChatId || '').trim(),
+		llmProvider: normalizeLlmProvider(llmProvider),
 		scheduleType,
 		scheduleTime,
 		scheduleDays,
@@ -484,7 +478,7 @@ export function startSchedule(
 	if (scheduleType === 'minutes') {
 		const intervalMs = autoTimeSetting * 60 * 1000;
 		console.log(
-			`[Scheduler] Scheduling "${title}" every ${autoTimeSetting}min (${intervalMs}ms), webSearch=${enableWebSearch}`
+			`[Scheduler] Scheduling "${title}" every ${autoTimeSetting}min (${intervalMs}ms), webSearch=${enableWebSearch}, llmProvider=${task.llmProvider}`
 		);
 		task.timer = setInterval(() => {
 			if (!activeTasks.has(id)) {
@@ -492,14 +486,14 @@ export function startSchedule(
 				clearInterval(task.timer);
 				return;
 			}
-			if (getRunningTaskCount() >= MAX_CONCURRENT_OLLAMA) {
+			if (getRunningTaskCount() >= MAX_CONCURRENT_LLM) {
 				console.log(`[Scheduler] Skipping "${title}" (interval): at concurrency limit, next interval will retry`);
 				return;
 			}
 			runTask(task, 'interval');
 		}, intervalMs);
 		activeTasks.set(id, task);
-		if (getRunningTaskCount() < MAX_CONCURRENT_OLLAMA) {
+		if (getRunningTaskCount() < MAX_CONCURRENT_LLM) {
 			runTask(task, 'immediate');
 		} else {
 			console.log(`[Scheduler] Deferring immediate run for "${title}": at concurrency limit`);

@@ -5,6 +5,7 @@
 	import BotAvatar from './BotAvatar.svelte';
 	import ModeToggle from './ModeToggle.svelte';
 	import { chatStore } from '$lib/stores/chat.svelte';
+	import { llmStore } from '$lib/stores/llm.svelte';
 
 	function handleNewChat() {
 		chatStore.createConversation();
@@ -65,7 +66,7 @@
 					<BotAvatar size={32} />
 					<div>
 						<h1 class="text-sm font-semibold">JukimBot</h1>
-						<p class="text-[10px] text-slate-500">llama3.1:8b &middot; Local</p>
+						<p class="text-[10px] text-slate-500">{llmStore.displayLabel}</p>
 					</div>
 				</div>
 			</div>

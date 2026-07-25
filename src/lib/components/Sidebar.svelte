@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { chatStore } from '$lib/stores/chat.svelte';
+	import { llmStore, LLM_PROVIDER_OPTIONS } from '$lib/stores/llm.svelte';
 	import { formatRelativeDate } from '$lib/utils/helpers';
+	import type { LlmProvider } from '$lib/types';
 	import BotAvatar from './BotAvatar.svelte';
 
 	function handleNewChat() {
@@ -18,6 +21,14 @@
 		e.stopPropagation();
 		chatStore.deleteConversation(id);
 	}
+
+	function handleProviderChange(provider: LlmProvider) {
+		llmStore.setProvider(provider);
+	}
+
+	onMount(() => {
+		void llmStore.refreshHealth();
+	});
 </script>
 
 <aside class="flex h-full flex-col bg-chat-surface">
@@ -45,6 +56,33 @@
 			</svg>
 			New Chat
 		</button>
+
+		<div class="mt-4 rounded-xl border border-chat-border bg-chat-bg/40 p-3">
+			<p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">Model</p>
+			<div class="space-y-1.5">
+				{#each LLM_PROVIDER_OPTIONS as option (option.value)}
+					<label
+						class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-chat-raised/60 {llmStore.provider ===
+						option.value
+							? 'bg-chat-raised text-slate-200'
+							: 'text-slate-400'}"
+					>
+						<input
+							type="radio"
+							name="llm-provider"
+							value={option.value}
+							checked={llmStore.provider === option.value}
+							onchange={() => handleProviderChange(option.value)}
+							class="accent-violet-500"
+						/>
+						<span class="flex-1">
+							<span class="font-medium">{option.label}</span>
+							<span class="text-slate-500"> — {option.model}</span>
+						</span>
+					</label>
+				{/each}
+			</div>
+		</div>
 	</div>
 
 	<!-- Conversation List -->
@@ -92,8 +130,17 @@
 	<!-- Footer -->
 	<div class="border-t border-chat-border p-3">
 		<div class="flex items-center gap-2 text-[10px] text-slate-600">
-			<div class="h-2 w-2 rounded-full bg-emerald-500"></div>
-			<span>Ollama Connected</span>
+			<div
+				class="h-2 w-2 rounded-full {llmStore.healthOk === true
+					? 'bg-emerald-500'
+					: llmStore.healthOk === false
+						? 'bg-red-500'
+						: 'bg-slate-500'}"
+			></div>
+			<span>
+				{llmStore.selectedOption.label}
+				{llmStore.healthLoading ? ' — checking…' : llmStore.healthOk ? ' Connected' : ' Unavailable'}
+			</span>
 		</div>
 	</div>
 </aside>

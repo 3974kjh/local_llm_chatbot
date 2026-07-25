@@ -28,7 +28,7 @@
 
 <svelte:head>
 	<title>JukimBot — {appStore.mode === 'chat' ? 'Chat' : 'Auto Mode'}</title>
-	<meta name="description" content="Chat with Llama 3.1 running locally via Ollama" />
+	<meta name="description" content="Chat with local Ollama or OpenRouter models" />
 </svelte:head>
 
 {#if appStore.mode === 'chat'}

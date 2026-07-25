@@ -8,11 +8,17 @@ export interface ResearchResult {
 	query: string;
 	results: SearchResult[];
 	pageContents: Array<{ url: string; content: string }>;
+	/** True when the user explicitly attached these URLs (highest priority). */
+	isUserProvided?: boolean;
 }
 
-const MAX_PAGE_CHARS = 5000;
+const DEFAULT_MAX_PAGE_CHARS = 5000;
 const MAX_SEED_PAGE_CHARS = 8000;
 const MAX_SEED_URLS = 5;
+
+export interface ExecuteResearchOptions {
+	maxPageChars?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Web search + page fetch (used per query in the research loop)
@@ -23,8 +29,10 @@ export async function executeResearch(
 	seenUrls: Set<string>,
 	urlsPerQuery: number,
 	signal?: AbortSignal,
-	calendarDate?: string
+	calendarDate?: string,
+	options?: ExecuteResearchOptions
 ): Promise<ResearchResult> {
+	const maxPageChars = options?.maxPageChars ?? DEFAULT_MAX_PAGE_CHARS;
 	const effectiveQuery =
 		calendarDate && /^\d{4}-\d{2}-\d{2}$/.test(calendarDate.trim())
 			? normalizeSearchQueryForRecency(query, calendarDate.trim())
@@ -65,12 +73,12 @@ export async function executeResearch(
 		if (content.length > 100) {
 			pageContents.push({
 				url: r.url,
-				content: content.slice(0, MAX_PAGE_CHARS)
+				content: content.slice(0, maxPageChars)
 			});
 		}
 	}
 
-	return { query: effectiveQuery, results, pageContents };
+	return { query: effectiveQuery, results, pageContents, isUserProvided: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +130,12 @@ export async function executeSeedUrlResearch(
 		}
 	}
 
-	return { query: 'User-attached URLs (prioritized)', results, pageContents };
+	return {
+		query: 'User-attached URLs (prioritized)',
+		results,
+		pageContents,
+		isUserProvided: true
+	};
 }
 
 function pageTitleFromUrl(url: string): string {
@@ -133,41 +146,72 @@ function pageTitleFromUrl(url: string): string {
 	}
 }
 
+function formatIterationBlock(iter: ResearchResult, index: number): string {
+	const snippets = iter.results
+		.map((r, j) => `  [${j + 1}] ${r.title}\n  URL: ${r.url}\n  Snippet: ${r.snippet}`)
+		.join('\n\n');
+
+	const pages = iter.pageContents
+		.map((p) => `  [Page URL: ${p.url}]\n${p.content}`)
+		.join('\n\n');
+
+	const label = iter.isUserProvided
+		? `User-Provided Source ${index + 1}`
+		: `Web Search ${index + 1}`;
+
+	return `=== ${label}: "${iter.query}" ===\nSearch Results:\n${snippets || '  (no results found)'}${pages ? `\n\nDetailed Page Content:\n${pages}` : ''}`;
+}
+
 // ---------------------------------------------------------------------------
 // Research context builder
 // ---------------------------------------------------------------------------
 
 export function buildResearchContext(iterations: ResearchResult[]): string {
-	const allSources: Array<{ title: string; url: string }> = [];
+	const userIterations = iterations.filter((iter) => iter.isUserProvided);
+	const webIterations = iterations.filter((iter) => !iter.isUserProvided);
+
+	const allSources: Array<{ title: string; url: string; isPriority: boolean }> = [];
 	const seenUrls = new Set<string>();
 
-	for (const iter of iterations) {
+	for (const iter of [...userIterations, ...webIterations]) {
 		for (const r of iter.results) {
 			if (!seenUrls.has(r.url)) {
 				seenUrls.add(r.url);
-				allSources.push({ title: r.title, url: r.url });
+				allSources.push({
+					title: r.title,
+					url: r.url,
+					isPriority: !!iter.isUserProvided
+				});
 			}
 		}
 	}
 
 	const sourceIndex =
 		allSources.length > 0
-			? `=== AVAILABLE SOURCES (use ONLY these URLs when citing) ===\n${allSources.map((s, i) => `[${i + 1}] ${s.title}\n    URL: ${s.url}`).join('\n\n')}\n\n`
+			? `=== AVAILABLE SOURCES (use ONLY these URLs when citing) ===\n${allSources
+					.map(
+						(s, i) =>
+							`[${i + 1}]${s.isPriority ? ' [PRIORITY — user-attached]' : ''} ${s.title}\n    URL: ${s.url}`
+					)
+					.join('\n\n')}\n\n`
 			: '';
 
-	const iterationBlocks = iterations
-		.map((iter, i) => {
-			const snippets = iter.results
-				.map((r, j) => `  [${j + 1}] ${r.title}\n  URL: ${r.url}\n  Snippet: ${r.snippet}`)
-				.join('\n\n');
+	const blocks: string[] = [];
 
-			const pages = iter.pageContents
-				.map((p) => `  [Page URL: ${p.url}]\n${p.content}`)
-				.join('\n\n');
+	if (userIterations.length > 0) {
+		blocks.push(
+			'=== USER-PROVIDED SOURCES (HIGHEST PRIORITY) ===\n' +
+				'When user-attached sources conflict with web search results, prefer user-attached sources.\n\n' +
+				userIterations.map((iter, i) => formatIterationBlock(iter, i)).join('\n\n')
+		);
+	}
 
-			return `=== Research Iteration ${i + 1}: "${iter.query}" ===\nSearch Results:\n${snippets || '  (no results found)'}${pages ? `\n\nDetailed Page Content:\n${pages}` : ''}`;
-		})
-		.join('\n\n');
+	if (webIterations.length > 0) {
+		blocks.push(
+			'=== WEB SEARCH RESULTS ===\n' +
+				webIterations.map((iter, i) => formatIterationBlock(iter, i)).join('\n\n')
+		);
+	}
 
-	return sourceIndex + iterationBlocks;
+	return sourceIndex + blocks.join('\n\n');
 }

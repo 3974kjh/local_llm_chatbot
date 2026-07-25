@@ -1,7 +1,7 @@
 import { extractFirstJsonObject } from '../extractJsonObject';
 import { WEB_FIRST_GROUNDING } from '../promptLocale';
 import { normalizeSearchQueryForRecency } from '../searchDate';
-import { callOllamaNonStreaming } from '../ollama';
+import { callLlmNonStreaming, type LlmProvider } from '../llm';
 
 export interface EvaluationResult {
 	thought: string;
@@ -102,7 +102,8 @@ export async function evaluateResearch(
 	minRounds: number,
 	maxRounds: number,
 	confidenceThreshold: number,
-	calendarDate: string
+	calendarDate: string,
+	provider: LlmProvider = 'local'
 ): Promise<EvaluationResult> {
 	const contextForEval = buildEvalContext(accumulatedContext);
 
@@ -129,10 +130,10 @@ ${contextForEval}
 				attempt > 0
 					? '\n\nCRITICAL: Your previous reply was not valid JSON. Output exactly ONE JSON object with keys thought, resolvedItems, unresolvedItems, nextQueries, confidence, needsMore. No markdown fences, no text before or after the JSON.'
 					: '';
-			const raw = await callOllamaNonStreaming(
+			const raw = await callLlmNonStreaming(
 				[{ role: 'user', content: userMessage + suffix }],
 				systemPrompt,
-				{ numPredict: 2048 }
+				{ provider, numPredict: 2048 }
 			);
 			return parseEvaluationFromRaw(raw, previousQueries, confidenceThreshold, calendarDate);
 		} catch (e) {

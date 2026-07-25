@@ -1,12 +1,15 @@
+import type { ClaimVerification } from '$lib/types';
+import { getDepthConfig, type AnswerDepth } from '../answerDepth';
 import { extractFirstJsonObject } from '../extractJsonObject';
 import {
-	createOllamaStream,
-	isOllamaTimeoutError,
-	callOllamaNonStreaming,
-	type OllamaMessage
-} from '../ollama';
+	createLlmStream,
+	isLlmTimeoutError,
+	callLlmNonStreaming,
+	pipeLlmChatStream,
+	type LlmMessage,
+	type LlmProvider
+} from '../llm';
 import { RESPONSE_LANGUAGE_KO, WEB_FIRST_GROUNDING } from '../promptLocale';
-import type { AxiosResponse } from 'axios';
 import { finalizeDeepSearchSynthesis } from './citationSanitizer';
 import {
 	analyzeResearchChunks,
@@ -16,27 +19,31 @@ import {
 	type DeepSearchSynthesisMode
 } from './chunkPipeline';
 
-const SYNTHESIZER_SYSTEM_PROMPT = `${RESPONSE_LANGUAGE_KO}
+function buildSynthesizerSystemPrompt(depthPrompt: string): string {
+	return `${RESPONSE_LANGUAGE_KO}
 
 ${WEB_FIRST_GROUNDING}
 
-You are a thorough research assistant. The research below is the only factual source. Your job is first to **extract and organize** what it actually says, then briefly interpret—never the reverse.
+${depthPrompt}
+
+You are a thorough research assistant. The research and verified draft below are your only factual sources. Extract and organize what they say, then interpret—never the reverse.
 
 MANDATORY SECTION ORDER (all headings and body in Korean except URLs/quotes):
-1. ### 조사에서 확인된 내용 — **Start here.** Bulleted list of everything the research text explicitly names or quotes: product names, brands, nicknames, trends, numbers, dates. **Reuse the exact wording from snippets or page text** for those names (do not substitute well-known generic examples). Every substantive bullet should include a markdown link with the EXACT URL from the research context. If the research mentions specific trendy snacks (or any domain), those strings must appear here before any general discussion. Do not pad with unrelated categories (e.g. perfume) or clichés (e.g. "떡볶이") unless those words literally appear in the research.
-2. ### 근거 시점 — Short: which dates or "as of" phrases appear in the research for key claims; if none, one honest Korean sentence. If the research is stale relative to the user's question date, say so clearly.
-3. ### 정리·해석 — **Only after section 1:** brief cross-source comparison, limitations, or "what this implies" in Korean. **Do not introduce new proper nouns, products, or facts** that were not already stated in section 1 or clearly quoted from the research. No new examples from training data. This section should be relatively short unless the user clearly needs deep interpretation.
+1. ### 조사에서 확인된 내용 — Bulleted list of everything the research text explicitly names or quotes: product names, brands, nicknames, trends, numbers, dates. Reuse exact wording from snippets or page text. Every substantive bullet should include a markdown link with the EXACT URL from the research context.
+2. ### 근거 시점 — Which dates or "as of" phrases appear in the research for key claims; if none, one honest Korean sentence. If research is stale relative to the user's question date, say so clearly.
+3. ### 정리·해석 — Cross-source comparison, limitations, or implications in Korean. Do not introduce new proper nouns, products, or facts not already stated in section 1 or clearly quoted from the research.
 
 Additional rules:
-- Base every factual claim on the research below — do NOT add facts from training data that are not supported by the research
-- When referencing a source, cite as markdown link with EXACT URL from the research: e.g. [출처 제목](https://exact-url-from-research.com)
+- Preserve ALL supported claims from the VERIFIED DRAFT — do not delete or distort them; expand with additional research-backed detail where available
+- Base every factual claim on the research below — do NOT add facts from training data
+- When referencing a source, cite as markdown link with EXACT URL from the research
 - NEVER invent, guess, or paraphrase URLs
-- Every number, percentage, index level, and calendar date must appear verbatim in the research snippets or page text; if missing, say in Korean it was not found in the gathered sources
-- Do NOT use markdown tables. Prefer bullets with quoted figures and a markdown link on the same or next line
-- Further ### subsections are allowed **only** for domain-specific detail that still cites the research (e.g. market metrics). Cross-cutting "synthesis" that merges sources belongs in ### 정리·해석, not in section 1
+- Every number, percentage, index level, and calendar date must appear verbatim in the research; if missing, say in Korean it was not found
+- Do NOT use markdown tables. Prefer bullets with quoted figures and a markdown link
+- Further ### subsections are allowed for domain-specific detail that still cites the research
 - Do NOT add "## 참고 자료" or "## References" — the system appends a verified list
-- If aspects could not be researched, say so honestly in Korean
-- For markets (stocks, indices, valuation): tie claims to PER/PBR only when those metrics appear in the research; otherwise state what is missing (in Korean)`;
+- If aspects could not be researched, say so honestly in Korean`;
+}
 
 const OUTLINE_SYSTEM_PROMPT = `You split a research report into sections for a Korean final report. Return ONLY valid JSON, no markdown.
 
@@ -59,6 +66,22 @@ RULES:
 interface OutlineSection {
 	title: string;
 	focus: string;
+}
+
+function buildVerifiedDraftBlock(
+	verifiedDraft?: string,
+	verifications?: ClaimVerification[]
+): string {
+	if (!verifiedDraft?.trim()) return '';
+	const lines = ['=== VERIFIED DRAFT (fact-checked — preserve all supported claims) ===', verifiedDraft.trim()];
+	if (verifications && verifications.length > 0) {
+		lines.push('', '=== CLAIM VERIFICATION SUMMARY ===');
+		for (const v of verifications) {
+			lines.push(`- [${v.status}] ${v.claim}`);
+		}
+	}
+	lines.push('=== END VERIFIED DRAFT ===');
+	return lines.join('\n');
 }
 
 function parseOutlineSections(raw: string): OutlineSection[] {
@@ -88,67 +111,6 @@ function parseOutlineSections(raw: string): OutlineSection[] {
 	}
 }
 
-async function pipeOllamaChatStream(
-	response: AxiosResponse,
-	enqueue: (data: Record<string, unknown>) => void,
-	sendClientDone: boolean,
-	onToken?: (token: string) => void
-): Promise<void> {
-	await new Promise<void>((resolve, reject) => {
-		let buffer = '';
-		let settled = false;
-
-		const finish = () => {
-			if (settled) return;
-			settled = true;
-			if (sendClientDone) {
-				enqueue({ type: 'done' });
-			}
-			resolve();
-		};
-
-		const handleParsed = (parsed: { message?: { content?: string }; done?: boolean }) => {
-			if (parsed.message?.content) {
-				onToken?.(parsed.message.content);
-				enqueue({ type: 'token', content: parsed.message.content });
-			}
-			if (parsed.done) {
-				finish();
-			}
-		};
-
-		response.data.on('data', (chunk: Buffer) => {
-			buffer += chunk.toString();
-			const lines = buffer.split('\n');
-			buffer = lines.pop() ?? '';
-
-			for (const line of lines) {
-				if (!line.trim()) continue;
-				try {
-					handleParsed(JSON.parse(line));
-				} catch {
-					// skip malformed lines
-				}
-			}
-		});
-
-		response.data.on('end', () => {
-			if (buffer.trim()) {
-				try {
-					handleParsed(JSON.parse(buffer));
-				} catch {
-					// skip
-				}
-			}
-			finish();
-		});
-
-		response.data.on('error', (err: Error) => {
-			reject(err);
-		});
-	});
-}
-
 function emitSynthesisFinalizeAndDone(
 	rawStreamedMarkdown: string,
 	researchContext: string,
@@ -164,12 +126,14 @@ function emitSynthesisFinalizeAndDone(
 async function streamSinglePassSynthesis(
 	userQuery: string,
 	researchContext: string,
-	conversationHistory: OllamaMessage[],
+	conversationHistory: LlmMessage[],
 	currentDate: string,
 	enqueue: (data: Record<string, unknown>) => void,
-	streamKind: 'synthesis' | 'section'
+	streamKind: 'synthesis' | 'section',
+	provider: LlmProvider,
+	depthPrompt: string
 ): Promise<void> {
-	const systemPrompt = `${SYNTHESIZER_SYSTEM_PROMPT}
+	const systemPrompt = `${buildSynthesizerSystemPrompt(depthPrompt)}
 
 **Current Date:** ${currentDate}
 
@@ -177,14 +141,14 @@ async function streamSinglePassSynthesis(
 ${researchContext}
 === END RESEARCH ===`;
 
-	const messages: OllamaMessage[] = [
+	const messages: LlmMessage[] = [
 		...conversationHistory,
 		{ role: 'user', content: userQuery }
 	];
 
 	let accumulated = '';
-	const response = await createOllamaStream(messages, systemPrompt, { streamKind });
-	await pipeOllamaChatStream(response, enqueue, false, (t) => {
+	const response = await createLlmStream(messages, systemPrompt, { provider, streamKind });
+	await pipeLlmChatStream(response, provider, enqueue, false, (t) => {
 		accumulated += t;
 	});
 	emitSynthesisFinalizeAndDone(accumulated, researchContext, enqueue);
@@ -193,16 +157,28 @@ ${researchContext}
 export async function synthesizeAnswer(
 	userQuery: string,
 	researchContext: string,
-	conversationHistory: OllamaMessage[],
+	conversationHistory: LlmMessage[],
 	currentDate: string,
 	enqueue: (data: Record<string, unknown>) => void,
 	options?: {
 		collectedTexts?: CollectedText[];
 		synthesisMode?: DeepSearchSynthesisMode;
+		llmProvider?: LlmProvider;
+		verifiedDraft?: string;
+		verifications?: ClaimVerification[];
+		answerDepth?: AnswerDepth;
 	}
 ): Promise<void> {
 	try {
+		const provider = options?.llmProvider ?? 'local';
 		const synthesisMode = options?.synthesisMode ?? 'hybrid';
+		const answerDepth = options?.answerDepth ?? 'standard';
+		const config = getDepthConfig(answerDepth);
+		const verifiedBlock = buildVerifiedDraftBlock(options?.verifiedDraft, options?.verifications);
+		const enrichedContext = verifiedBlock
+			? `${researchContext}\n\n${verifiedBlock}`
+			: researchContext;
+
 		if (synthesisMode === 'raw-only') {
 			enqueue({ type: 'done' });
 			return;
@@ -213,34 +189,50 @@ export async function synthesizeAnswer(
 			(synthesisMode === 'hybrid' || synthesisMode === 'chunked') &&
 			collectedTexts.length > 0;
 
-		if (shouldChunkAnalyze) {
+		if (shouldChunkAnalyze && !config.useMultiSectionSynth) {
 			const chunks = buildResearchChunks(collectedTexts, {
 				targetChars: synthesisMode === 'chunked' ? 2600 : 3200,
 				hardMaxChars: synthesisMode === 'chunked' ? 3600 : 4200
 			});
-			const analyses = await analyzeResearchChunks(chunks, userQuery, currentDate);
+			const analyses = await analyzeResearchChunks(chunks, userQuery, currentDate, undefined, provider);
 			const chunkContext = buildChunkAnalysisContext(analyses);
 			if (chunkContext) {
 				const compactContext = `${chunkContext}
 
 === ORIGINAL RESEARCH (TRIMMED) ===
-${researchContext.slice(0, 6000)}`;
+${enrichedContext.slice(0, config.synthHybridTrimChars)}`;
 				await streamSinglePassSynthesis(
 					userQuery,
 					compactContext,
 					conversationHistory,
 					currentDate,
 					enqueue,
-					'synthesis'
+					'synthesis',
+					provider,
+					config.depthPrompt
 				);
 				return;
 			}
 		}
 
-		const researchForOutline = researchContext.slice(0, 16000);
+		if (!config.useMultiSectionSynth) {
+			await streamSinglePassSynthesis(
+				userQuery,
+				enrichedContext.slice(0, config.synthContextChars),
+				conversationHistory,
+				currentDate,
+				enqueue,
+				'synthesis',
+				provider,
+				config.depthPrompt
+			);
+			return;
+		}
+
+		const researchForOutline = enrichedContext.slice(0, config.synthContextChars);
 		let outlineRaw = '';
 		try {
-			outlineRaw = await callOllamaNonStreaming(
+			outlineRaw = await callLlmNonStreaming(
 				[
 					{
 						role: 'user',
@@ -248,27 +240,31 @@ ${researchContext.slice(0, 6000)}`;
 					}
 				],
 				OUTLINE_SYSTEM_PROMPT,
-				{ numPredict: 1536 }
+				{ provider, numPredict: 2048 }
 			);
 		} catch (outlineErr) {
 			console.warn('[answerSynthesizer] Outline request failed, using single-pass synthesis:', outlineErr);
 			outlineRaw = '';
 		}
 
-		const sections = parseOutlineSections(outlineRaw).slice(0, 5);
+		const sections = parseOutlineSections(outlineRaw).slice(0, config.synthMaxSections);
 
 		if (sections.length < 2) {
 			await streamSinglePassSynthesis(
 				userQuery,
-				researchContext,
+				enrichedContext.slice(0, config.synthContextChars),
 				conversationHistory,
 				currentDate,
 				enqueue,
-				'synthesis'
+				'synthesis',
+				provider,
+				config.depthPrompt
 			);
 			return;
 		}
 
+		const synthPrompt = buildSynthesizerSystemPrompt(config.depthPrompt);
+		const contextForSections = enrichedContext.slice(0, config.synthContextChars);
 		let draftAccum = '';
 
 		for (let i = 0; i < sections.length; i++) {
@@ -277,7 +273,7 @@ ${researchContext.slice(0, 6000)}`;
 			const isLastSection = i === sections.length - 1;
 			const firstSectionExtra = isFirstSection
 				? `
-- 이 절은 전체 보고서의 **제1절(근거 추출)**이다. 불릿·짧은 문장 위주로 RESEARCH GATHERED에 **실제로 등장한** 고유명·상품명·브랜드·수치를 빠짐없이 옮긴다. 연구에 없는 유명 예시·상투적 간식·무관 카테고리로 채우지 않는다. 분량은 나열량에 맞추되 허수 장문 금지.`
+- 이 절은 전체 보고서의 **제1절(근거 추출)**이다. RESEARCH GATHERED와 VERIFIED DRAFT에 **실제로 등장한** 고유명·상품명·브랜드·수치를 빠짐없이 옮긴다. 연구에 없는 유명 예시로 채우지 않는다. 분량은 나열량에 맞춰 충실히 작성한다.`
 				: '';
 			const lastSectionExtra = isLastSection
 				? `
@@ -286,15 +282,15 @@ ${researchContext.slice(0, 6000)}`;
 			const midSectionExtra =
 				!isFirstSection && !isLastSection
 					? `
-- 이 절은 중간 주제 절이다. 연구에 근거한 구체 항목·비교만 서술하고, 교차 요약은 가능하나 **연구에 없는 이름·사례는 넣지 않는다.**`
+- 이 절은 중간 주제 절이다. 연구에 근거한 구체 항목·비교를 충실히 서술하고, **연구에 없는 이름·사례는 넣지 않는다.**`
 					: '';
 
-			const sectionSystem = `${SYNTHESIZER_SYSTEM_PROMPT}
+			const sectionSystem = `${synthPrompt}
 
 **Current Date:** ${currentDate}
 
 === RESEARCH GATHERED ===
-${researchContext}
+${contextForSections}
 === END RESEARCH ===
 
 You are writing ONE section of a longer Korean report (part ${i + 1} of ${sections.length}).
@@ -302,17 +298,20 @@ You are writing ONE section of a longer Korean report (part ${i + 1} of ${sectio
 - Section focus: ${sec.focus}
 - 본문은 한국어로만 작성한다. 연구에 나온 URL로 마크다운 링크를 단다.
 - 질문 전체를 제목으로 반복하지 않는다. 이 절에서 "## 참고 자료" 섹션을 만들지 않는다.
-- CRITICAL: 모든 숫자·날짜·비율·통계명은 위 RESEARCH GATHERED에 그대로 있을 때만 쓴다. 이 절에 필요한 자료가 없거나 과거 연도에만 있으면 한국어로 명시하고 학습 지식으로 채우지 않는다.${firstSectionExtra}${midSectionExtra}${lastSectionExtra}`;
+- CRITICAL: 모든 숫자·날짜·비율·통계명은 위 RESEARCH GATHERED에 그대로 있을 때만 쓴다.${firstSectionExtra}${midSectionExtra}${lastSectionExtra}`;
 
-			const sectionUser = `섹션 ${i + 1}/${sections.length}만 작성한다: "${sec.title}". 위 연구 블록에만 근거한다.`;
+			const sectionUser = `섹션 ${i + 1}/${sections.length}만 작성한다: "${sec.title}". 위 연구 블록과 검증된 초안에만 근거한다.`;
 
-			const messages: OllamaMessage[] = [
+			const messages: LlmMessage[] = [
 				...conversationHistory,
 				{ role: 'user', content: sectionUser }
 			];
 
-			const response = await createOllamaStream(messages, sectionSystem, { streamKind: 'section' });
-			await pipeOllamaChatStream(response, enqueue, false, (t) => {
+			const response = await createLlmStream(messages, sectionSystem, {
+				provider,
+				streamKind: 'section'
+			});
+			await pipeLlmChatStream(response, provider, enqueue, false, (t) => {
 				draftAccum += t;
 			});
 
@@ -326,8 +325,8 @@ You are writing ONE section of a longer Korean report (part ${i + 1} of ${sectio
 		emitSynthesisFinalizeAndDone(draftAccum, researchContext, enqueue);
 	} catch (error: unknown) {
 		let msg = '답변 합성에 실패했습니다.';
-		if (isOllamaTimeoutError(error)) {
-			msg = '합성 중 Ollama 응답이 지연되어 타임아웃되었습니다. 잠시 후 다시 시도해 주세요.';
+		if (isLlmTimeoutError(error)) {
+			msg = '합성 중 LLM 응답이 지연되어 타임아웃되었습니다. 잠시 후 다시 시도해 주세요.';
 		} else if (error instanceof Error) {
 			msg = error.message;
 		}

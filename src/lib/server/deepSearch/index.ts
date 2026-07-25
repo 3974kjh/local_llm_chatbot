@@ -1,62 +1,140 @@
-import { getDeepSearchBudget, resolveDeepSearchPreset } from '$lib/deepSearchBudget';
+import { getDeepSearchBudget, resolveDeepSearchPreset, type DeepSearchBudget } from '$lib/deepSearchBudget';
+import type { ClaimVerification } from '$lib/types';
+import { enqueueProgress } from '../chatProgress';
+import { getDepthConfig, resolveAnswerDepth } from '../answerDepth';
+import type { LlmMessage, LlmProvider } from '../llm';
 import { resolveSearchCalendarDate } from '../searchDate';
-import type { OllamaMessage } from '../ollama';
-import { planQuery } from './queryPlanner';
-import {
-	executeResearch,
-	buildResearchContext,
-	executeSeedUrlResearch
-} from './researchExecutor';
-import { evaluateResearch } from './iterationEvaluator';
+import { draftAnswer } from './answerDrafter';
+import { decomposeAnswer } from './answerDecomposer';
+import { refineAnswer } from './answerRefiner';
 import { synthesizeAnswer } from './answerSynthesizer';
 import {
-	buildCollectedTextsMarkdown,
-	type CollectedText,
-	type DeepSearchSynthesisMode
-} from './chunkPipeline';
-
-function buildFallbackQueries(
-	userQuery: string,
-	subQuestions: string[],
-	usedQueries: string[],
-	max: number
-): string[] {
-	const normalizedUsed = new Set(usedQueries.map((q) => q.trim().toLowerCase()));
-	const out: string[] = [];
-	for (const sq of subQuestions) {
-		const piece = sq.trim();
-		if (!piece) continue;
-		const q = `${userQuery} — ${piece}`.trim();
-		const key = q.toLowerCase();
-		if (!normalizedUsed.has(key)) {
-			out.push(q);
-			normalizedUsed.add(key);
-		}
-		if (out.length >= max) return out;
-	}
-	const extra = `${userQuery} verification alternate sources`;
-	if (!normalizedUsed.has(extra.toLowerCase())) out.push(extra);
-	return out.slice(0, max);
-}
+	applyEvidenceContextCheck,
+	computeClaimConfidence,
+	verifyClaims
+} from './claimVerifier';
+import { finalizeDeepSearchSynthesis } from './citationSanitizer';
+import { buildCollectedTextsMarkdown, type CollectedText } from './chunkPipeline';
+import { buildGapSearchQueries } from './gapSearchPlanner';
+import { planQuery } from './queryPlanner';
+import {
+	buildResearchContext,
+	executeResearch,
+	executeSeedUrlResearch,
+	type ResearchResult
+} from './researchExecutor';
 
 export interface DeepSearchOptions {
-	messages: OllamaMessage[];
+	messages: LlmMessage[];
 	userQuery: string;
 	currentDate: string;
-	/** Client YYYY-MM-DD for search recency (same as chat API). */
 	localeCalendarDate?: string;
 	enqueue: (data: Record<string, unknown>) => void;
 	signal?: AbortSignal;
 	seedUrls?: string[];
-	/** Research depth: fast | balanced | deep */
 	preset?: string | null;
-	/** Synthesis mode: hybrid | chunked | raw-only */
-	synthesisMode?: DeepSearchSynthesisMode | string | null;
+	llmProvider?: LlmProvider;
+}
+
+const TOKEN_CHUNK_SIZE = 24;
+
+interface WebSearchState {
+	seenUrls: Set<string>;
+	usedQueries: string[];
+	totalUrlsFetched: number;
+}
+
+function streamTextAsTokens(text: string, enqueue: (data: Record<string, unknown>) => void): void {
+	for (let i = 0; i < text.length; i += TOKEN_CHUNK_SIZE) {
+		enqueue({ type: 'token', content: text.slice(i, i + TOKEN_CHUNK_SIZE) });
+	}
+}
+
+function buildWarningBanner(hasEvidence: boolean, confidence: number): string {
+	if (hasEvidence) return '';
+	if (confidence <= 0.5) {
+		return `> **주의:** 첨부된 출처가 없습니다. 아래 답변은 LLM 추론이며 사실 확인되지 않았습니다.\n\n`;
+	}
+	return '';
+}
+
+function rebuildCollectedTexts(allIterations: ResearchResult[]): CollectedText[] {
+	const collectedTexts: CollectedText[] = [];
+	for (let i = 0; i < allIterations.length; i++) {
+		const iter = allIterations[i];
+		for (const p of iter.pageContents) {
+			const meta = iter.results.find((r) => r.url === p.url);
+			collectedTexts.push({
+				url: p.url,
+				title: meta?.title ?? p.url,
+				query: iter.query,
+				iteration: i + 1,
+				content: p.content
+			});
+		}
+	}
+	return collectedTexts;
+}
+
+function countPageContents(iterations: ResearchResult[]): number {
+	return iterations.reduce((sum, iter) => sum + iter.pageContents.length, 0);
+}
+
+async function runWebSearchRound(
+	queries: string[],
+	allIterations: ResearchResult[],
+	state: WebSearchState,
+	budget: DeepSearchBudget,
+	calendarDate: string,
+	enqueue: (data: Record<string, unknown>) => void,
+	signal?: AbortSignal,
+	maxPageChars?: number
+): Promise<number> {
+	let pagesFetched = 0;
+
+	for (const query of queries) {
+		if (signal?.aborted) break;
+		if (state.totalUrlsFetched >= budget.maxTotalUrls) break;
+
+		const remainingBudget = budget.maxTotalUrls - state.totalUrlsFetched;
+		const urlsForThisQuery = Math.min(budget.urlsPerQuery, remainingBudget);
+		if (urlsForThisQuery <= 0) break;
+
+		enqueueProgress(enqueue, {
+			phase: 'collect',
+			label: '웹 검색 중',
+			detail: query
+		});
+		enqueue({ type: 'searching', query });
+
+		const result = await executeResearch(
+			query,
+			state.seenUrls,
+			urlsForThisQuery,
+			signal,
+			calendarDate,
+			{ maxPageChars }
+		);
+
+		state.usedQueries.push(result.query);
+		allIterations.push(result);
+		pagesFetched += result.pageContents.length;
+		state.totalUrlsFetched += result.pageContents.length;
+
+		if (result.results.length > 0) {
+			enqueue({
+				type: 'sources',
+				results: result.results,
+				query: result.query,
+				isUserProvided: false
+			});
+		}
+	}
+
+	return pagesFetched;
 }
 
 export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
-	const calendarDate = resolveSearchCalendarDate(options.localeCalendarDate, options.currentDate);
-
 	let keepAlive: ReturnType<typeof setInterval> | null = null;
 	keepAlive = setInterval(() => {
 		try {
@@ -67,7 +145,7 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 	}, 20_000);
 
 	try {
-		await runDeepSearchImpl(options, calendarDate);
+		await runDeepSearchImpl(options);
 	} finally {
 		if (keepAlive) {
 			clearInterval(keepAlive);
@@ -76,14 +154,31 @@ export async function runDeepSearch(options: DeepSearchOptions): Promise<void> {
 	}
 }
 
-async function runDeepSearchImpl(
-	options: DeepSearchOptions,
-	calendarDate: string
-): Promise<void> {
-	const { messages, userQuery, currentDate, enqueue, signal, seedUrls } = options;
+async function runDeepSearchImpl(options: DeepSearchOptions): Promise<void> {
+	const {
+		messages,
+		userQuery,
+		currentDate,
+		enqueue,
+		signal,
+		seedUrls,
+		llmProvider = 'local'
+	} = options;
+
+	const calendarDate = resolveSearchCalendarDate(options.localeCalendarDate, currentDate);
 	const resolvedPreset = resolveDeepSearchPreset(options.preset);
 	const BUDGET = getDeepSearchBudget(options.preset);
-	const resolvedSynthesisMode = resolveSynthesisMode(options.synthesisMode);
+	const answerDepth = resolveAnswerDepth(userQuery, { preset: resolvedPreset });
+	const depthConfig = getDepthConfig(answerDepth);
+
+	enqueueProgress(enqueue, { phase: 'prepare', label: '딥 리서치 준비 중' });
+
+	enqueue({
+		type: 'start',
+		preset: resolvedPreset,
+		refineRounds: BUDGET.refineRounds,
+		answerDepth
+	});
 
 	const conversationContext =
 		messages.length > 2
@@ -93,52 +188,57 @@ async function runDeepSearchImpl(
 					.join('\n')
 			: '';
 
-	// Shared state across all rounds
-	const allIterations: Awaited<ReturnType<typeof executeResearch>>[] = [];
-	const seenUrls = new Set<string>();
-	const usedQueries: string[] = [];
-	let totalUrlsFetched = 0;
+	const searchState: WebSearchState = {
+		seenUrls: new Set<string>(),
+		usedQueries: [],
+		totalUrlsFetched: 0
+	};
 
 	// ------------------------------------------------------------------
-	// Phase 0: User-attached seed URLs (fetched before planning)
+	// Phase 0: User-attached seed URLs
 	// ------------------------------------------------------------------
 	const cleanedSeeds = (seedUrls ?? [])
 		.map((s) => (typeof s === 'string' ? s.trim() : ''))
 		.filter(Boolean);
 
+	const allIterations: ResearchResult[] = [];
+
 	if (cleanedSeeds.length > 0) {
-		console.log('[DeepSearch] Fetching user-attached URLs first...');
-		for (const u of cleanedSeeds) {
-			if (signal?.aborted) return;
-			enqueue({ type: 'searching', query: `Attached URL: ${u}` });
-		}
+		console.log('[DeepSearch] Fetching user-attached URLs...');
+		enqueueProgress(enqueue, { phase: 'collect', label: '첨부 URL 수집 중' });
 		const seedBlock = await executeSeedUrlResearch(cleanedSeeds, signal);
 		if (signal?.aborted) return;
 		if (seedBlock && seedBlock.results.length > 0) {
 			allIterations.push(seedBlock);
-			for (const r of seedBlock.results) seenUrls.add(r.url);
-			totalUrlsFetched += seedBlock.pageContents.length;
+			for (const r of seedBlock.results) searchState.seenUrls.add(r.url);
+			searchState.totalUrlsFetched += seedBlock.pageContents.length;
 			enqueue({
 				type: 'sources',
 				results: seedBlock.results,
-				query: 'Attached URLs (analyzed first)'
+				query: '첨부된 URL',
+				isUserProvided: true
 			});
 		}
 	}
 
-	const attachmentContextPreview =
-		allIterations.length > 0 ? buildResearchContext(allIterations).slice(0, 3000) : '';
+	let sourceContext = buildResearchContext(allIterations);
+	let hasEvidence = allIterations.some((iter) => iter.pageContents.length > 0);
 
 	// ------------------------------------------------------------------
-	// Phase 1: Query planning (informed by attachment context)
+	// Phase 0.5: Query planning
 	// ------------------------------------------------------------------
+	const attachmentContextPreview =
+		allIterations.length > 0 ? sourceContext.slice(0, 3000) : '';
+
 	console.log('[DeepSearch] Planning queries...');
+	enqueueProgress(enqueue, { phase: 'collect', label: '검색 전략 수립 중' });
 	const plan = await planQuery(
 		userQuery,
 		currentDate,
 		conversationContext,
 		attachmentContextPreview || undefined,
-		calendarDate
+		calendarDate,
+		llmProvider
 	);
 
 	enqueue({
@@ -146,209 +246,278 @@ async function runDeepSearchImpl(
 		subQueries: plan.subQueries,
 		strategy: plan.strategy,
 		subQuestions: plan.subQuestions,
-		stopCriteria: plan.stopCriteria,
-		preset: resolvedPreset
+		stopCriteria: plan.stopCriteria
 	});
 
 	if (signal?.aborted) return;
 
 	// ------------------------------------------------------------------
-	// Phase 2: Budget-based research loop
+	// Phase 0.6: Initial web search
 	// ------------------------------------------------------------------
-	let currentQueries = plan.subQueries.slice(0, BUDGET.maxQueriesPerRound);
-	let consecutiveEmptyRounds = 0;
-	let lastConfidence = 0;
-	let stopReason = `Reached maximum rounds (${BUDGET.maxRounds})`;
-
-	for (let round = 1; round <= BUDGET.maxRounds; round++) {
-		if (signal?.aborted) return;
-
-		// --- Budget gate ---
-		if (totalUrlsFetched >= BUDGET.maxTotalUrls) {
-			stopReason = `URL budget reached (${BUDGET.maxTotalUrls} pages fetched)`;
-			console.log(`[DeepSearch] ${stopReason}`);
-			break;
-		}
-
-		enqueue({
-			type: 'iteration_start',
-			iteration: round,
-			maxIterations: BUDGET.maxRounds,
-			totalUrlsFetched,
-			confidenceThreshold: BUDGET.confidenceThreshold
-		});
-
-		// Announce queries
-		for (const query of currentQueries) {
-			if (signal?.aborted) return;
-			enqueue({ type: 'searching', query });
-		}
-
-		// Execute research in parallel
-		const roundResults = await Promise.all(
-			currentQueries.map((q) =>
-				executeResearch(q, seenUrls, BUDGET.urlsPerQuery, signal, calendarDate)
-			)
+	const initialQueries = plan.subQueries.slice(0, BUDGET.initialSubQueries);
+	if (initialQueries.length > 0 && searchState.totalUrlsFetched < BUDGET.maxTotalUrls) {
+		console.log(`[DeepSearch] Initial web search: ${initialQueries.join(', ')}`);
+		enqueueProgress(enqueue, { phase: 'collect', label: '웹 검색 중' });
+		await runWebSearchRound(
+			initialQueries,
+			allIterations,
+			searchState,
+			BUDGET,
+			calendarDate,
+			enqueue,
+			signal,
+			depthConfig.maxPageChars
 		);
-		if (signal?.aborted) return;
+	}
 
-		// Count new URLs fetched this round
-		let newUrlsThisRound = 0;
-		let attemptedUrlsThisRound = 0;
-		for (const result of roundResults) {
-			usedQueries.push(result.query);
-			allIterations.push(result);
-			newUrlsThisRound += result.pageContents.length;
-			attemptedUrlsThisRound += result.results.length;
-			totalUrlsFetched += result.pageContents.length;
+	sourceContext = buildResearchContext(allIterations);
+	hasEvidence = allIterations.some((iter) => iter.pageContents.length > 0);
 
-			if (result.results.length > 0) {
-				enqueue({ type: 'sources', results: result.results, query: result.query });
-			}
-		}
-
-		// Convergence: require both no new successful pages AND no new search attempts
-		const hadResearchActivity = newUrlsThisRound > 0 || attemptedUrlsThisRound > 0;
-		if (hadResearchActivity) {
-			consecutiveEmptyRounds = 0;
-		} else {
-			consecutiveEmptyRounds++;
-		}
-
-		if (consecutiveEmptyRounds >= BUDGET.convergenceWindow) {
-			stopReason = `Search converged — no new pages found in ${BUDGET.convergenceWindow} consecutive rounds`;
-			console.log(`[DeepSearch] ${stopReason}`);
-			break;
-		}
-
-		// --- Evaluate ---
-		const accumulatedContext = buildResearchContext(allIterations);
-		const evaluation = await evaluateResearch(
-			userQuery,
-			plan.stopCriteria,
-			accumulatedContext,
-			usedQueries,
-			round,
-			BUDGET.minRounds,
-			BUDGET.maxRounds,
-			BUDGET.confidenceThreshold,
-			calendarDate
-		);
-
-		lastConfidence = evaluation.confidence ?? lastConfidence;
-
+	if (!hasEvidence) {
 		enqueue({
-			type: 'evaluation',
-			thought: evaluation.thought,
-			needsMore: evaluation.needsMore,
-			refinedQueries: evaluation.nextQueries,
-			...(evaluation.confidence != null ? { confidence: evaluation.confidence } : {}),
-			resolvedItems: evaluation.resolvedItems,
-			unresolvedItems: evaluation.unresolvedItems
+			type: 'evidence_warning',
+			message:
+				'첨부된 출처가 없습니다. 답변은 LLM 추론이며 사실 확인되지 않았습니다. 정확한 답변을 위해 관련 URL을 첨부해 주세요.'
 		});
-
-		// --- Stop conditions (do not early-exit before minRounds unless URL budget hit above) ---
-		if (
-			round >= BUDGET.minRounds &&
-			evaluation.confidence != null &&
-			evaluation.confidence >= BUDGET.confidenceThreshold &&
-			evaluation.unresolvedItems.length === 0
-		) {
-			stopReason = `Research complete — confidence ${Math.round(evaluation.confidence * 100)}%, all criteria resolved`;
-			console.log(`[DeepSearch] ${stopReason}`);
-			break;
-		}
-
-		const evaluatorWouldStop =
-			!evaluation.needsMore || evaluation.nextQueries.length === 0;
-
-		if (round >= BUDGET.minRounds && evaluatorWouldStop) {
-			const pct =
-				evaluation.confidence != null ? Math.round(evaluation.confidence * 100) : null;
-			stopReason =
-				pct != null
-					? `Evaluator satisfied at round ${round} (confidence ${pct}%)`
-					: `Evaluator satisfied at round ${round}`;
-			console.log(`[DeepSearch] ${stopReason}`);
-			break;
-		}
-
-		if (round === BUDGET.maxRounds) {
-			stopReason = `Reached maximum rounds (${BUDGET.maxRounds}), confidence ${Math.round(lastConfidence * 100)}%`;
-			break;
-		}
-
-		// Prepare next round queries
-		let nextQueries = evaluation.nextQueries.slice(0, BUDGET.maxQueriesPerRound);
-		if (nextQueries.length === 0) {
-			nextQueries = buildFallbackQueries(
-				userQuery,
-				plan.subQuestions,
-				usedQueries,
-				BUDGET.maxQueriesPerRound
-			);
-		}
-		if (nextQueries.length === 0) {
-			stopReason = `No further queries available at round ${round}`;
-			console.log(`[DeepSearch] ${stopReason}`);
-			break;
-		}
-		currentQueries = nextQueries;
-		console.log(`[DeepSearch] Round ${round} done. Next: ${currentQueries.join(', ')}`);
 	}
 
 	if (signal?.aborted) return;
 
-	// Broadcast stop summary before synthesis
-	enqueue({ type: 'complete', stopReason, confidence: lastConfidence });
-
-	// ------------------------------------------------------------------
-	// Phase 2.5: Emit raw research findings (no LLM opinion)
-	// ------------------------------------------------------------------
-	const sourceMeta = new Map<string, { title: string; query: string; iteration: number }>();
-	for (let i = 0; i < allIterations.length; i++) {
-		const iter = allIterations[i];
-		for (const r of iter.results) {
-			if (!sourceMeta.has(r.url)) {
-				sourceMeta.set(r.url, { title: r.title, query: iter.query, iteration: i + 1 });
-			}
-		}
-	}
-
-	const collectedTexts: CollectedText[] = [];
-	for (let i = 0; i < allIterations.length; i++) {
-		const iter = allIterations[i];
-		for (const p of iter.pageContents) {
-			const meta = sourceMeta.get(p.url);
-			collectedTexts.push({
-				url: p.url,
-				title: meta?.title ?? p.url,
-				query: meta?.query ?? iter.query,
-				iteration: meta?.iteration ?? i + 1,
-				content: p.content
-			});
-		}
-	}
-
+	let collectedTexts = rebuildCollectedTexts(allIterations);
 	if (collectedTexts.length > 0) {
 		enqueue({ type: 'raw_answer', content: buildCollectedTextsMarkdown(collectedTexts) });
 	}
 
 	// ------------------------------------------------------------------
-	// Phase 3: Synthesis
+	// Phase 1: Initial draft
 	// ------------------------------------------------------------------
-	if (resolvedSynthesisMode !== 'raw-only') {
-		enqueue({ type: 'synthesis_start' });
+	console.log('[DeepSearch] Drafting initial answer...');
+	enqueueProgress(enqueue, { phase: 'analyze', label: '초안 작성 중' });
+	let currentDraft = await draftAnswer(
+		userQuery,
+		sourceContext,
+		messages.slice(-10),
+		currentDate,
+		hasEvidence,
+		llmProvider,
+		answerDepth
+	);
+
+	if (signal?.aborted) return;
+
+	enqueue({ type: 'draft', content: currentDraft.slice(0, 500) });
+
+	let lastConfidence = hasEvidence ? 0.5 : BUDGET.confidenceCapWithoutEvidence;
+	let stopReason = `Completed ${BUDGET.refineRounds} verification round(s)`;
+	let lastVerifications: ClaimVerification[] = [];
+
+	// ------------------------------------------------------------------
+	// Phase 2~N: Verify-refine loop (with mid-round gap web search)
+	// ------------------------------------------------------------------
+	for (let round = 1; round <= BUDGET.refineRounds; round++) {
+		if (signal?.aborted) return;
+
+		enqueue({
+			type: 'refine_start',
+			round,
+			maxRounds: BUDGET.refineRounds
+		});
+
+		enqueueProgress(enqueue, {
+			phase: 'analyze',
+			label: '검증 중',
+			detail: `${round}/${BUDGET.refineRounds} 라운드`
+		});
+
+		console.log(`[DeepSearch] Refine round ${round}/${BUDGET.refineRounds}: decomposing...`);
+		const decomposed = await decomposeAnswer(userQuery, currentDraft, llmProvider);
+		if (signal?.aborted) return;
+
+		enqueue({
+			type: 'decompose',
+			subQuestions: decomposed.subQuestions,
+			claims: decomposed.claims
+		});
+
+		console.log(`[DeepSearch] Refine round ${round}: verifying ${decomposed.claims.length} claims...`);
+		let verifications = await verifyClaims(
+			decomposed.claims,
+			sourceContext,
+			hasEvidence,
+			llmProvider
+		);
+		if (hasEvidence) {
+			verifications = applyEvidenceContextCheck(verifications, sourceContext);
+		}
+
+		// Gap-fill web search when claims are unsupported/contradicted
+		const gapClaims = verifications
+			.filter((v) => v.status === 'unsupported' || v.status === 'contradicted')
+			.map((v) => v.claim);
+
+		if (
+			gapClaims.length > 0 &&
+			searchState.totalUrlsFetched < BUDGET.maxTotalUrls
+		) {
+			const gapQueries = buildGapSearchQueries(
+				userQuery,
+				gapClaims,
+				calendarDate,
+				searchState.usedQueries,
+				BUDGET.maxGapSearches
+			);
+
+			if (gapQueries.length > 0) {
+				console.log(
+					`[DeepSearch] Gap web search round ${round}: ${gapQueries.join(', ')}`
+				);
+
+				enqueueProgress(enqueue, {
+					phase: 'collect',
+					label: '추가 검색 중',
+					detail: `라운드 ${round}`
+				});
+
+				const pagesFetched = await runWebSearchRound(
+					gapQueries,
+					allIterations,
+					searchState,
+					BUDGET,
+					calendarDate,
+					enqueue,
+					signal,
+					depthConfig.maxPageChars
+				);
+
+				if (pagesFetched > 0) {
+					sourceContext = buildResearchContext(allIterations);
+					hasEvidence = true;
+					collectedTexts = rebuildCollectedTexts(allIterations);
+					enqueue({
+						type: 'raw_answer',
+						content: buildCollectedTextsMarkdown(collectedTexts)
+					});
+
+					enqueue({
+						type: 'web_search',
+						round,
+						queries: gapQueries,
+						pagesFetched,
+						reason: 'gap_fill'
+					});
+
+					// Re-verify with expanded context
+					verifications = await verifyClaims(
+						decomposed.claims,
+						sourceContext,
+						hasEvidence,
+						llmProvider
+					);
+					verifications = applyEvidenceContextCheck(verifications, sourceContext);
+				}
+			}
+		}
+
+		lastConfidence = computeClaimConfidence(
+			verifications,
+			hasEvidence,
+			BUDGET.confidenceCapWithoutEvidence
+		);
+
+		lastVerifications = verifications;
+
+		enqueue({
+			type: 'verify',
+			results: verifications,
+			confidence: lastConfidence
+		});
+
+		if (signal?.aborted) return;
+
+		console.log(`[DeepSearch] Refine round ${round}: refining draft...`);
+		const refined = await refineAnswer(
+			userQuery,
+			currentDraft,
+			decomposed.subQuestions,
+			verifications,
+			sourceContext,
+			hasEvidence,
+			llmProvider,
+			answerDepth
+		);
+
+		currentDraft = refined.revisedDraft;
+
+		enqueue({
+			type: 'refine',
+			thought: refined.thought,
+			revisedDraft: currentDraft.slice(0, 500),
+			confidence: lastConfidence
+		});
+
+		// Early exit if all claims supported
+		const allSupported =
+			verifications.length > 0 &&
+			verifications.every((v) => v.status === 'supported');
+		if (allSupported && hasEvidence) {
+			stopReason = `All claims verified at round ${round}`;
+			console.log(`[DeepSearch] ${stopReason}`);
+			break;
+		}
 	}
 
-	const finalContext = buildResearchContext(allIterations);
-	await synthesizeAnswer(userQuery, finalContext, messages.slice(-10), currentDate, enqueue, {
-		collectedTexts,
-		synthesisMode: resolvedSynthesisMode
-	});
-}
+	if (signal?.aborted) return;
 
-function resolveSynthesisMode(mode?: string | null): DeepSearchSynthesisMode {
-	if (mode === 'raw-only' || mode === 'chunked' || mode === 'hybrid') return mode;
-	return 'hybrid';
+	enqueue({
+		type: 'complete',
+		stopReason,
+		confidence: lastConfidence,
+		totalPagesFetched: countPageContents(allIterations)
+	});
+
+	enqueueProgress(enqueue, { phase: 'write', label: '최종 답변 작성 중' });
+
+	// ------------------------------------------------------------------
+	// Phase Final: Hybrid synthesis (or brief direct stream)
+	// ------------------------------------------------------------------
+	enqueue({ type: 'synthesis_start' });
+
+	const warningBanner = buildWarningBanner(hasEvidence, lastConfidence);
+
+	if (answerDepth === 'brief') {
+		const finalText = warningBanner + currentDraft;
+		const { text: sanitized } = finalizeDeepSearchSynthesis(
+			finalText,
+			sourceContext || collectedTexts.map((t) => t.url).join('\n')
+		);
+		streamTextAsTokens(sanitized, enqueue);
+		if (sanitized !== finalText) {
+			enqueue({ type: 'synthesis_final', content: sanitized });
+		}
+		enqueueProgress(enqueue, { phase: 'complete', label: '완료' });
+		enqueue({ type: 'done' });
+		return;
+	}
+
+	if (warningBanner) {
+		enqueue({ type: 'token', content: warningBanner });
+	}
+
+	await synthesizeAnswer(
+		userQuery,
+		sourceContext,
+		messages.slice(-10),
+		currentDate,
+		enqueue,
+		{
+			collectedTexts,
+			synthesisMode: 'hybrid',
+			llmProvider,
+			verifiedDraft: currentDraft,
+			verifications: lastVerifications,
+			answerDepth
+		}
+	);
+
+	enqueueProgress(enqueue, { phase: 'complete', label: '완료' });
 }

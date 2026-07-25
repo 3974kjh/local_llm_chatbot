@@ -1,10 +1,18 @@
 import type { RequestHandler } from './$types';
 import { runDeepSearch } from '$lib/server/deepSearch';
+import { normalizeLlmProvider } from '$lib/server/llm';
 import { resolveSearchCalendarDate } from '$lib/server/searchDate';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { messages, query, currentDate, seedUrls, localeCalendarDate, preset, synthesisMode } =
-		await request.json();
+	const {
+		messages,
+		query,
+		currentDate,
+		seedUrls,
+		localeCalendarDate,
+		preset,
+		llmProvider
+	} = await request.json();
 
 	const encoder = new TextEncoder();
 	const abortController = new AbortController();
@@ -32,7 +40,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					signal: abortController.signal,
 					seedUrls: Array.isArray(seedUrls) ? seedUrls : undefined,
 					preset: typeof preset === 'string' ? preset : undefined,
-					synthesisMode: typeof synthesisMode === 'string' ? synthesisMode : undefined
+					llmProvider: normalizeLlmProvider(llmProvider)
 				});
 			} catch (error: unknown) {
 				const msg = error instanceof Error ? error.message : 'Deep search failed';

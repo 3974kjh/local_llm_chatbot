@@ -1,4 +1,4 @@
-import { callOllamaNonStreaming } from '../ollama';
+import { callLlmNonStreaming, type LlmProvider } from '../llm';
 import { extractFirstJsonObject } from '../extractJsonObject';
 
 export type DeepSearchSynthesisMode = 'hybrid' | 'chunked' | 'raw-only';
@@ -131,12 +131,13 @@ export async function analyzeResearchChunks(
 	chunks: ResearchChunk[],
 	userQuery: string,
 	currentDate: string,
-	emit?: (analysis: ChunkAnalysis) => void
+	emit?: (analysis: ChunkAnalysis) => void,
+	provider: LlmProvider = 'local'
 ): Promise<ChunkAnalysis[]> {
 	if (chunks.length === 0) return [];
 
 	const analyses = await mapWithConcurrency(chunks, 2, async (chunk) => {
-		const analysis = await analyzeOneChunk(chunk, userQuery, currentDate);
+		const analysis = await analyzeOneChunk(chunk, userQuery, currentDate, provider);
 		emit?.(analysis);
 		return analysis;
 	});
@@ -146,7 +147,8 @@ export async function analyzeResearchChunks(
 async function analyzeOneChunk(
 	chunk: ResearchChunk,
 	userQuery: string,
-	currentDate: string
+	currentDate: string,
+	provider: LlmProvider = 'local'
 ): Promise<ChunkAnalysis> {
 	const systemPrompt = `You analyze one research chunk for later synthesis.
 
@@ -171,10 +173,10 @@ Chunk text:
 ${chunk.content}`;
 
 	try {
-		const raw = await callOllamaNonStreaming(
+		const raw = await callLlmNonStreaming(
 			[{ role: 'user', content: userPrompt }],
 			systemPrompt,
-			{ numPredict: 900 }
+			{ provider, numPredict: 900 }
 		);
 		const parsed = parseChunkAnalysis(raw);
 		return {

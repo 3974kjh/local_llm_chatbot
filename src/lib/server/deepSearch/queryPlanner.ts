@@ -1,6 +1,6 @@
 import { extractFirstJsonObject } from '../extractJsonObject';
 import { WEB_FIRST_GROUNDING } from '../promptLocale';
-import { callOllamaNonStreaming } from '../ollama';
+import { callLlmNonStreaming, type LlmProvider } from '../llm';
 
 export interface QueryPlan {
 	subQueries: string[];
@@ -37,7 +37,8 @@ export async function planQuery(
 	currentDate: string,
 	conversationContext: string,
 	priorResearchFromAttachments: string | undefined,
-	calendarDateIso: string
+	calendarDateIso: string,
+	provider: LlmProvider = 'local'
 ): Promise<QueryPlan> {
 	const userMessage = `Question: ${userQuery}
 Current date: ${currentDate}
@@ -48,9 +49,10 @@ ${priorResearchFromAttachments ? `\nResearch already extracted from user-attache
 연구 계획을 JSON으로만 출력한다.`;
 
 	try {
-		const raw = await callOllamaNonStreaming(
+		const raw = await callLlmNonStreaming(
 			[{ role: 'user', content: userMessage }],
-			PLANNER_SYSTEM_PROMPT
+			PLANNER_SYSTEM_PROMPT,
+			{ provider }
 		);
 
 		const jsonStr = extractFirstJsonObject(raw);

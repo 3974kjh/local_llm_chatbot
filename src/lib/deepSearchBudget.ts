@@ -2,43 +2,45 @@
 export type DeepSearchPreset = 'fast' | 'balanced' | 'deep';
 
 export type DeepSearchBudget = {
-	maxRounds: number;
-	minRounds: number;
-	maxTotalUrls: number;
+	/** Number of verify-refine loops after the initial draft. */
+	refineRounds: number;
+	/** Max confidence when no seed URLs are attached (LLM self-verification only). */
+	confidenceCapWithoutEvidence: number;
+	/** Number of plan subQueries to run before the initial draft. */
+	initialSubQueries: number;
+	/** Max gap-fill web searches per verify-refine round. */
+	maxGapSearches: number;
+	/** Pages to fetch per search query. */
 	urlsPerQuery: number;
-	maxQueriesPerRound: number;
-	confidenceThreshold: number;
-	convergenceWindow: number;
+	/** Total page fetch cap (seed URLs + web search). */
+	maxTotalUrls: number;
 };
 
-/** Tuned presets: fast (shorter), balanced (legacy default), deep (more thorough). */
+/** Tuned presets: fast (shorter), balanced (default), deep (more thorough). */
 export const DEEP_SEARCH_PRESETS: Record<DeepSearchPreset, DeepSearchBudget> = {
 	fast: {
-		maxRounds: 4,
-		minRounds: 2,
-		maxTotalUrls: 12,
+		refineRounds: 1,
+		confidenceCapWithoutEvidence: 0.5,
+		initialSubQueries: 1,
+		maxGapSearches: 1,
 		urlsPerQuery: 2,
-		maxQueriesPerRound: 2,
-		confidenceThreshold: 0.82,
-		convergenceWindow: 2
+		maxTotalUrls: 8
 	},
 	balanced: {
-		maxRounds: 7,
-		minRounds: 4,
-		maxTotalUrls: 25,
+		refineRounds: 2,
+		confidenceCapWithoutEvidence: 0.5,
+		initialSubQueries: 2,
+		maxGapSearches: 2,
 		urlsPerQuery: 3,
-		maxQueriesPerRound: 3,
-		confidenceThreshold: 0.92,
-		convergenceWindow: 3
+		maxTotalUrls: 15
 	},
 	deep: {
-		maxRounds: 9,
-		minRounds: 5,
-		maxTotalUrls: 38,
-		urlsPerQuery: 4,
-		maxQueriesPerRound: 4,
-		confidenceThreshold: 0.94,
-		convergenceWindow: 3
+		refineRounds: 4,
+		confidenceCapWithoutEvidence: 0.5,
+		initialSubQueries: 3,
+		maxGapSearches: 3,
+		urlsPerQuery: 3,
+		maxTotalUrls: 25
 	}
 } as const;
 

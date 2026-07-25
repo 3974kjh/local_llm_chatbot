@@ -14,3 +14,10 @@ export const WEB_FIRST_GROUNDING = `근거 우선(필수): 사실·수치·날�
 
 /** When web search is off or empty: honest fallback, still Korean. */
 export const CHAT_NO_SEARCH_KO = `웹 검색 결과가 이 요청에 포함되지 않았다. 답변은 학습 시점의 지식에 의존할 수 있어 최신 정보와 다를 수 있다. 한국어로 답하고, 최신 수치·뉴스가 중요한 주제면 사용자에게 웹 검색을 켜 달라고 안내한다.`;
+
+/** Adaptive answer length instructions keyed by depth tier. */
+export const ANSWER_DEPTH_PROMPTS = {
+	brief: `분량(간결): 핵심만 2–4문단으로 답한다. 불필요한 반복·장황한 서론은 피한다. 질문에 직접 답하는 사실을 우선한다.`,
+	standard: `분량(표준): 주제별 ### 소제목으로 구조화하고, 제공 자료의 근거를 인용한다. 질문의 각 측면을 빠짐없이 다루되 허수 장문은 피한다.`,
+	comprehensive: `분량(심층): 수집 자료에서 확인된 사실을 빠짐없이 서술한다. ### 소제목 4개 이상으로 주제를 나누고, 출처별 비교·한계·시점(as of)을 명시한다. 모델 출력 한도까지 충실히 작성하되, 자료에 없는 사실은 추가하지 않는다. 허수 장문은 금지하나 자료 기반 상세 서술은 적극 권장한다.`
+} as const;

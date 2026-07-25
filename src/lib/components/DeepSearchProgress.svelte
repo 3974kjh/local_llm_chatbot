@@ -1,93 +1,112 @@
 <script lang="ts">
 	import { DEEP_SEARCH_BUDGET } from '$lib/deepSearchBudget';
-	import type { DeepSearchStep } from '$lib/types';
+	import type { ClaimStatus, DeepSearchStep } from '$lib/types';
 	import { slide } from 'svelte/transition';
 
 	let { steps, isStreaming }: { steps: DeepSearchStep[]; isStreaming: boolean } = $props();
 
 	let manualOverride = $state<boolean | null>(null);
-	const expanded = $derived(manualOverride !== null ? manualOverride : isStreaming);
+	const expanded = $derived(manualOverride !== null ? manualOverride : false);
 
 	function toggle() {
 		manualOverride = !expanded;
 	}
 
-	const totalSources = $derived(
-		steps
-			.filter((s) => s.type === 'sources')
-			.reduce((acc, s) => acc + (s.results?.length ?? 0), 0)
-	);
-
-	const roundCount = $derived(steps.filter((s) => s.type === 'iteration_start').length);
+	const roundCount = $derived(steps.filter((s) => s.type === 'refine_start').length);
 
 	const maxRoundsDisplay = $derived(
-		[...steps].reverse().find((s) => s.type === 'iteration_start')?.maxIterations ??
-			DEEP_SEARCH_BUDGET.maxRounds
+		[...steps].reverse().find((s) => s.type === 'refine_start')?.maxRounds ??
+			DEEP_SEARCH_BUDGET.refineRounds
 	);
 
-	const lastEval = $derived(
-		[...steps].reverse().find((s) => s.type === 'evaluation')
-	);
+	const lastVerify = $derived([...steps].reverse().find((s) => s.type === 'verify'));
 
 	const completeStep = $derived(steps.find((s) => s.type === 'complete'));
 
-	/** From latest iteration_start (preset-aware); falls back to balanced default. */
-	const evalConfidenceThreshold = $derived(
-		[...steps].reverse().find((s) => s.type === 'iteration_start')?.confidenceThreshold ??
-			DEEP_SEARCH_BUDGET.confidenceThreshold
-	);
+	const evidenceWarning = $derived(steps.find((s) => s.type === 'evidence_warning'));
 
-	const planPresetLabel = $derived.by(() => {
-		const p = steps.find((s) => s.type === 'plan')?.preset;
+	const presetLabel = $derived.by(() => {
+		const p = steps.find((s) => s.type === 'start')?.preset;
 		if (p === 'fast') return 'Fast';
 		if (p === 'deep') return 'Deep';
 		if (p === 'balanced') return 'Balanced';
 		return null;
 	});
 
-	const latestUrlCount = $derived(
-		(() => {
-			const last = [...steps].reverse().find((s) => s.type === 'iteration_start');
-			return last?.totalUrlsFetched ?? 0;
-		})()
+	const totalSources = $derived(
+		steps
+			.filter((s) => s.type === 'sources')
+			.reduce((acc, s) => acc + (s.sourceResults?.length ?? 0), 0)
+	);
+
+	const totalPagesFetched = $derived(
+		completeStep?.totalPagesFetched ??
+			steps
+				.filter((s) => s.type === 'web_search')
+				.reduce((acc, s) => acc + (s.pagesFetched ?? 0), 0)
 	);
 
 	const summaryLine = $derived(
 		[
-			roundCount > 0 ? `Round ${roundCount}/${maxRoundsDisplay}` : null,
-			latestUrlCount > 0 ? `${latestUrlCount} pages fetched` : null,
-			lastEval?.confidence != null
-				? `${Math.round(lastEval.confidence * 100)}% confidence`
+			roundCount > 0 ? `검증 ${roundCount}/${maxRoundsDisplay}` : null,
+			lastVerify?.confidence != null
+				? `${Math.round(lastVerify.confidence * 100)}% 신뢰도`
 				: null,
-			totalSources > 0 ? `${totalSources} sources` : null
+			totalSources > 0 ? `${totalSources}개 출처` : null,
+			totalPagesFetched > 0 ? `${totalPagesFetched}페이지` : null,
+			evidenceWarning ? '출처 없음' : null
 		]
 			.filter(Boolean)
 			.join(' · ')
 	);
 
-	function confidenceColor(c: number, threshold: number): string {
-		if (c >= threshold) return 'text-teal-400';
-		if (c >= 0.55) return 'text-amber-400';
+	function confidenceColor(c: number): string {
+		if (c >= 0.75) return 'text-teal-400';
+		if (c >= 0.5) return 'text-amber-400';
 		return 'text-red-400';
 	}
 
 	function confidenceBarWidth(c: number): string {
 		return `${Math.round(c * 100)}%`;
 	}
+
+	function claimStatusLabel(status: ClaimStatus): string {
+		switch (status) {
+			case 'supported':
+				return '지원됨';
+			case 'unsupported':
+				return '미지원';
+			case 'contradicted':
+				return '모순';
+			case 'unverifiable':
+				return '확인 불가';
+		}
+	}
+
+	function claimStatusColor(status: ClaimStatus): string {
+		switch (status) {
+			case 'supported':
+				return 'text-teal-400';
+			case 'unsupported':
+				return 'text-amber-400';
+			case 'contradicted':
+				return 'text-red-400';
+			case 'unverifiable':
+				return 'text-slate-500';
+		}
+	}
 </script>
 
 <div
 	class="mb-3 w-full min-w-0 max-w-full overflow-x-hidden rounded-xl border border-chat-border bg-chat-raised"
 >
-	<!-- Header / toggle -->
 	<button
 		onclick={toggle}
 		class="flex w-full min-w-0 max-w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-chat-surface"
 	>
 		<div class="flex min-w-0 shrink items-center gap-2">
-			<!-- Microscope icon -->
 			<svg
-				class="h-4 w-4 text-violet-400 flex-shrink-0"
+				class="h-4 w-4 flex-shrink-0 text-violet-400"
 				viewBox="0 0 24 24"
 				fill="none"
 				stroke="currentColor"
@@ -105,10 +124,12 @@
 			<span class="text-sm font-medium text-slate-300">Deep Research</span>
 			{#if isStreaming}
 				<span class="flex items-center gap-1">
-					<span class="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse"></span>
-					<span class="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse [animation-delay:150ms]"
+					<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400"></span>
+					<span
+						class="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400 [animation-delay:150ms]"
 					></span>
-					<span class="h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse [animation-delay:300ms]"
+					<span
+						class="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-400 [animation-delay:300ms]"
 					></span>
 				</span>
 			{/if}
@@ -120,7 +141,6 @@
 					{summaryLine}
 				</span>
 			{/if}
-			<!-- Chevron -->
 			<svg
 				class="h-4 w-4 text-slate-500 transition-transform duration-200 {expanded
 					? 'rotate-180'
@@ -137,211 +157,168 @@
 		</div>
 	</button>
 
-	<!-- Expanded steps -->
 	{#if expanded}
 		<div
 			transition:slide={{ duration: 200 }}
 			class="min-w-0 max-w-full overflow-x-hidden px-4 pb-4 pt-1"
 		>
 			<div class="relative flex min-w-0 max-w-full flex-col gap-0">
-				<!-- Vertical timeline line -->
 				<div
-					class="absolute top-3 bottom-3 left-3.5 w-px bg-gradient-to-b from-violet-500/40 via-chat-border to-teal-500/20"
+					class="absolute bottom-3 left-3.5 top-3 w-px bg-gradient-to-b from-violet-500/40 via-chat-border to-teal-500/20"
 				></div>
 
 				{#each steps as step, i (i)}
 					<div class="relative flex min-w-0 max-w-full gap-3 py-2">
-						<!-- Step dot -->
-						{#if step.type === 'plan'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-violet-500/15 border border-violet-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-violet-400"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<rect x="5" y="2" width="14" height="20" rx="2" />
-									<path d="M9 7h6M9 11h6M9 15h4" />
-								</svg>
-							</div>
-						{:else if step.type === 'iteration_start'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/15 border border-indigo-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-indigo-400"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-									<path d="M21 3v5h-5" />
-								</svg>
-							</div>
-						{:else if step.type === 'searching'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15 border border-teal-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-teal-400 {isStreaming ? 'animate-spin' : ''}"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<circle cx="11" cy="11" r="8" />
-									<path d="m21 21-4.3-4.3" />
-								</svg>
-							</div>
-						{:else if step.type === 'sources'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15 border border-teal-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-teal-400"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-									<polyline points="14 2 14 8 20 8" />
-								</svg>
-							</div>
-						{:else if step.type === 'evaluation'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15 border border-amber-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-amber-400"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<circle cx="12" cy="12" r="10" />
-									<path d="M12 16v-4M12 8h.01" />
-								</svg>
-							</div>
-						{:else if step.type === 'complete'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15 border border-teal-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-teal-400"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2.5"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<path d="M20 6L9 17l-5-5" />
-								</svg>
-							</div>
-						{:else if step.type === 'synthesis_start'}
-							<div
-								class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/15 border border-indigo-500/30"
-							>
-								<svg
-									class="h-3.5 w-3.5 text-indigo-400"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<polygon
-										points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
-									/>
-								</svg>
-							</div>
-						{/if}
+						<div
+							class="z-10 mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border {step.type ===
+							'evidence_warning'
+								? 'border-amber-500/30 bg-amber-500/15'
+								: step.type === 'verify'
+									? 'border-amber-500/30 bg-amber-500/15'
+									: step.type === 'refine'
+										? 'border-indigo-500/30 bg-indigo-500/15'
+										: step.type === 'complete'
+											? 'border-teal-500/30 bg-teal-500/15'
+											: 'border-violet-500/30 bg-violet-500/15'}"
+						>
+							<span class="text-[10px] font-bold text-violet-300">
+								{step.type === 'refine_start' ? (step.round ?? '?') : '·'}
+							</span>
+						</div>
 
-						<!-- Step content -->
-						<div class="min-w-0 max-w-full flex-1 overflow-hidden pt-0.5 break-words [overflow-wrap:anywhere]">
-							{#if step.type === 'plan'}
-								<p class="mb-1 text-xs font-semibold text-violet-300">Research plan</p>
-								{#if planPresetLabel}
-									<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-										Depth: <span class="text-violet-300">{planPresetLabel}</span>
+						<div
+							class="min-w-0 max-w-full flex-1 overflow-hidden break-words pt-0.5 [overflow-wrap:anywhere]"
+						>
+							{#if step.type === 'start'}
+								<p class="mb-1 text-xs font-semibold text-violet-300">검증-반복 모드 시작</p>
+								{#if presetLabel}
+									<p class="text-[10px] text-slate-500">
+										Depth: <span class="text-violet-300">{presetLabel}</span>
+										{#if step.message}
+											· {step.message}
+										{/if}
 									</p>
 								{/if}
+							{:else if step.type === 'evidence_warning'}
+								<div class="rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-2">
+									<p class="text-[11px] font-medium text-amber-300">외부 출처 없음</p>
+									<p class="mt-0.5 text-[11px] text-amber-200/80">{step.message}</p>
+								</div>
+							{:else if step.type === 'plan'}
+								<p class="mb-1 text-xs font-semibold text-violet-300">연구 계획</p>
 								{#if step.strategy}
-									<p class="mb-2 text-xs text-slate-400">{step.strategy}</p>
+									<p class="mb-2 text-[11px] leading-relaxed text-slate-400">{step.strategy}</p>
 								{/if}
 								{#if step.subQueries && step.subQueries.length > 0}
-									<div class="mb-2 flex flex-wrap gap-1.5">
+									<p class="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+										검색 쿼리
+									</p>
+									<ul class="flex flex-col gap-0.5">
 										{#each step.subQueries as q (q)}
-											<span
-												class="max-w-full rounded-full border border-violet-500/20 bg-violet-500/10 px-2.5 py-0.5 text-[11px] leading-snug text-violet-300 break-words [overflow-wrap:anywhere]"
-											>{q}</span>
+											<li class="text-[11px] text-slate-400">• {q}</li>
+										{/each}
+									</ul>
+								{/if}
+							{:else if step.type === 'searching'}
+								<p class="text-xs font-semibold text-sky-300">웹 검색 중</p>
+								{#if step.query}
+									<p class="mt-0.5 text-[11px] text-slate-400">{step.query}</p>
+								{/if}
+							{:else if step.type === 'web_search'}
+								<p class="mb-1 text-xs font-semibold text-sky-300">
+									갭 웹 검색 (라운드 {step.round ?? '?'})
+								</p>
+								{#if step.queries && step.queries.length > 0}
+									<ul class="mb-1 flex flex-col gap-0.5">
+										{#each step.queries as q (q)}
+											<li class="text-[11px] text-slate-400">• {q}</li>
+										{/each}
+									</ul>
+								{/if}
+								{#if step.pagesFetched != null}
+									<p class="text-[10px] text-slate-500">{step.pagesFetched}페이지 수집</p>
+								{/if}
+							{:else if step.type === 'draft'}
+								<p class="mb-1 text-xs font-semibold text-violet-300">초안 생성</p>
+								{#if step.content}
+									<p class="text-[11px] leading-relaxed text-slate-500">{step.content}…</p>
+								{/if}
+							{:else if step.type === 'refine_start'}
+								<p class="text-xs font-semibold text-indigo-300">
+									검증 라운드 {step.round ?? '?'}/{step.maxRounds ??
+										DEEP_SEARCH_BUDGET.refineRounds}
+								</p>
+							{:else if step.type === 'decompose'}
+								<p class="mb-1 text-xs font-semibold text-violet-300">하위 질문 · 주장 분해</p>
+								{#if step.subQuestions && step.subQuestions.length > 0}
+									<ul class="mb-2 flex flex-col gap-0.5">
+										{#each step.subQuestions as q (q)}
+											<li class="text-[11px] text-slate-400">• {q}</li>
+										{/each}
+									</ul>
+								{/if}
+								{#if step.claims && step.claims.length > 0}
+									<p class="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+										{step.claims.length}개 주장
+									</p>
+								{/if}
+							{:else if step.type === 'verify'}
+								{#if step.confidence != null}
+									<div class="mb-2 flex items-center gap-2">
+										<div class="h-1.5 flex-1 rounded-full bg-chat-border">
+											<div
+												class="h-full rounded-full transition-all {step.confidence >= 0.75
+													? 'bg-teal-400'
+													: step.confidence >= 0.5
+														? 'bg-amber-400'
+														: 'bg-red-400'}"
+												style="width: {confidenceBarWidth(step.confidence)}"
+											></div>
+										</div>
+										<span
+											class="flex-shrink-0 text-[11px] font-semibold {confidenceColor(
+												step.confidence
+											)}"
+										>
+											{Math.round(step.confidence * 100)}%
+										</span>
+									</div>
+								{/if}
+								<p class="mb-1 text-xs font-semibold text-amber-300">주장 검증</p>
+								{#if step.claimResults && step.claimResults.length > 0}
+									<div class="flex flex-col gap-1">
+										{#each step.claimResults as v (v.claim)}
+											<div class="flex items-start gap-1.5 text-[11px]">
+												<span class="flex-shrink-0 {claimStatusColor(v.status)}">
+													[{claimStatusLabel(v.status)}]
+												</span>
+												<span class="text-slate-400">{v.claim}</span>
+											</div>
 										{/each}
 									</div>
 								{/if}
-								{#if step.stopCriteria && step.stopCriteria.length > 0}
-									<div class="mt-1.5 rounded-lg border border-chat-border bg-chat-surface/50 px-2.5 py-2">
-										<p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Completion checklist</p>
-										<ul class="flex flex-col gap-0.5">
-											{#each step.stopCriteria as c (c)}
-												<li class="flex items-start gap-1.5 text-[11px] text-slate-400">
-													<span class="mt-0.5 flex-shrink-0 text-slate-600">○</span>
-													<span class="break-words [overflow-wrap:anywhere]">{c}</span>
-												</li>
-											{/each}
-										</ul>
-									</div>
+							{:else if step.type === 'refine'}
+								<p class="mb-1 text-xs font-semibold text-indigo-300">답변 수정</p>
+								{#if step.thought}
+									<p class="mb-1 text-[11px] leading-relaxed text-slate-400">{step.thought}</p>
 								{/if}
-							{:else if step.type === 'iteration_start'}
-								<div class="flex flex-wrap items-center gap-2">
-									<p class="text-xs font-semibold text-indigo-300">
-										Round {step.iteration ?? '?'}/{step.maxIterations ?? DEEP_SEARCH_BUDGET.maxRounds}
-									</p>
-									{#if step.totalUrlsFetched != null}
-										<span class="text-[10px] text-slate-500">{step.totalUrlsFetched} pages fetched</span>
-									{/if}
-								</div>
-							{:else if step.type === 'searching'}
-								<div class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-									<span class="flex-shrink-0 text-xs text-slate-400">Searching:</span>
-									<span class="text-xs font-medium text-teal-300 break-all [overflow-wrap:anywhere]">
-										"{step.query}"
-									</span>
-								</div>
 							{:else if step.type === 'sources'}
 								<div class="flex min-w-0 flex-wrap items-center gap-1.5">
 									<span
-										class="inline-flex flex-shrink-0 items-center gap-1 text-xs font-medium text-teal-300"
+										class="text-xs font-medium {step.isUserProvided
+											? 'text-amber-300'
+											: 'text-teal-300'}"
 									>
-										<span
-											class="inline-flex h-4 min-w-4 items-center justify-center rounded bg-teal-500/15 px-1 text-[10px] font-bold text-teal-300"
-										>{step.results?.length ?? 0}</span>
-										source{(step.results?.length ?? 0) !== 1 ? 's' : ''} found
+										{step.sourceResults?.length ?? 0}개
+										{step.isUserProvided ? '첨부 출처 (우선)' : '웹 검색 출처'}
 									</span>
-									{#if step.query}
-										<span class="min-w-0 text-xs text-slate-500 break-words">
-											for "{step.query}"
-										</span>
+									{#if step.query && !step.isUserProvided}
+										<span class="text-[10px] text-slate-500">· {step.query}</span>
 									{/if}
 								</div>
-								{#if step.results && step.results.length > 0}
+								{#if step.sourceResults && step.sourceResults.length > 0}
 									<ul class="mt-2 flex min-w-0 max-w-full flex-col gap-1.5">
-										{#each step.results as r (r.url)}
+										{#each step.sourceResults as r (r.url)}
 											<li class="min-w-0 max-w-full">
 												<a
 													href={r.url}
@@ -354,126 +331,43 @@
 													>
 														{r.title}
 													</p>
-													<p class="mt-0.5 break-all text-[10px] text-slate-500 [overflow-wrap:anywhere]">
+													<p
+														class="mt-0.5 break-all text-[10px] text-slate-500 [overflow-wrap:anywhere]"
+													>
 														{r.url}
 													</p>
-													{#if r.snippet}
-														<p
-															class="mt-1 text-[11px] leading-snug text-slate-400 break-words [overflow-wrap:anywhere]"
-														>
-															{r.snippet}
-														</p>
-													{/if}
 												</a>
 											</li>
 										{/each}
 									</ul>
 								{/if}
-							{:else if step.type === 'evaluation'}
-								{#if step.confidence != null}
-									<div class="mb-2 flex items-center gap-2">
-										<div class="h-1.5 flex-1 rounded-full bg-chat-border">
-											<div
-												class="h-full rounded-full transition-all {step.confidence >=
-												evalConfidenceThreshold
-													? 'bg-teal-400'
-													: step.confidence >= 0.55
-														? 'bg-amber-400'
-														: 'bg-red-400'}"
-												style="width: {confidenceBarWidth(step.confidence)}"
-											></div>
-										</div>
-										<span
-											class="flex-shrink-0 text-[11px] font-semibold {confidenceColor(
-												step.confidence,
-												evalConfidenceThreshold
-											)}"
-										>
-											{Math.round(step.confidence * 100)}%
-										</span>
-									</div>
-								{/if}
-								{#if step.thought}
-									<p class="mb-1.5 text-xs leading-relaxed text-slate-400 break-words [overflow-wrap:anywhere]">
-										{step.thought}
-									</p>
-								{/if}
-								{#if step.resolvedItems && step.resolvedItems.length > 0}
-									<div class="mb-1 flex flex-col gap-0.5">
-										{#each step.resolvedItems as item (item)}
-											<div class="flex items-start gap-1 text-[11px] text-teal-400">
-												<span class="flex-shrink-0">✓</span>
-												<span class="break-words [overflow-wrap:anywhere]">{item}</span>
-											</div>
-										{/each}
-									</div>
-								{/if}
-								{#if step.unresolvedItems && step.unresolvedItems.length > 0}
-									<div class="mb-1 flex flex-col gap-0.5">
-										{#each step.unresolvedItems as item (item)}
-											<div class="flex items-start gap-1 text-[11px] text-amber-400/80">
-												<span class="flex-shrink-0">○</span>
-												<span class="break-words [overflow-wrap:anywhere]">{item}</span>
-											</div>
-										{/each}
-									</div>
-								{/if}
-								{#if step.needsMore}
-									<div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-										<span class="flex-shrink-0 text-xs text-amber-400">→</span>
-										<span class="flex-shrink-0 text-xs text-amber-300">Searching further</span>
-										{#if step.refinedQueries && step.refinedQueries.length > 0}
-											<span class="min-w-0 text-xs text-slate-500 break-words [overflow-wrap:anywhere]">
-												· {step.refinedQueries[0]}
-											</span>
-										{/if}
-									</div>
-								{:else}
-									<div class="mt-1 flex items-center gap-1.5">
-										<span class="text-xs text-teal-400">✓</span>
-										<span class="text-xs text-teal-300">Sufficient information gathered</span>
-									</div>
-								{/if}
 							{:else if step.type === 'complete'}
 								<div class="rounded-lg border border-teal-500/20 bg-teal-500/5 px-2.5 py-2">
 									<div class="flex items-center justify-between gap-2">
-										<p class="text-[11px] font-semibold text-teal-300">Research complete</p>
+										<p class="text-[11px] font-semibold text-teal-300">검증 완료</p>
 										{#if step.confidence != null}
 											<span
-												class="text-[11px] font-bold {confidenceColor(
-													step.confidence,
-													evalConfidenceThreshold
-												)}"
+												class="text-[11px] font-bold {confidenceColor(step.confidence)}"
 											>
-												{Math.round(step.confidence * 100)}% confident
+												{Math.round(step.confidence * 100)}% 신뢰도
 											</span>
 										{/if}
 									</div>
 									{#if step.stopReason}
-										<p class="mt-0.5 text-[10px] text-slate-500 break-words [overflow-wrap:anywhere]">
+										<p
+											class="mt-0.5 break-words text-[10px] text-slate-500 [overflow-wrap:anywhere]"
+										>
 											{step.stopReason}
+										</p>
+									{/if}
+									{#if step.totalPagesFetched != null && step.totalPagesFetched > 0}
+										<p class="mt-0.5 text-[10px] text-slate-500">
+											총 {step.totalPagesFetched}페이지 수집
 										</p>
 									{/if}
 								</div>
 							{:else if step.type === 'synthesis_start'}
-								<div class="flex items-center gap-2">
-									<p class="text-xs font-semibold text-indigo-300">
-										Synthesizing final answer
-									</p>
-									{#if isStreaming}
-										<span class="flex items-center gap-0.5">
-											<span
-												class="h-1 w-1 rounded-full bg-indigo-400 animate-pulse"
-											></span>
-											<span
-												class="h-1 w-1 rounded-full bg-indigo-400 animate-pulse [animation-delay:150ms]"
-											></span>
-											<span
-												class="h-1 w-1 rounded-full bg-indigo-400 animate-pulse [animation-delay:300ms]"
-											></span>
-										</span>
-									{/if}
-								</div>
+								<p class="text-xs font-semibold text-indigo-300">최종 답변 출력</p>
 							{/if}
 						</div>
 					</div>

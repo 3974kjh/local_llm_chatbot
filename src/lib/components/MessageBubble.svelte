@@ -5,6 +5,7 @@
 	import SourceCard from './SourceCard.svelte';
 	import ThinkingIndicator from './ThinkingIndicator.svelte';
 	import BotAvatar from './BotAvatar.svelte';
+	import ChatProgressStepper from './ChatProgressStepper.svelte';
 	import DeepSearchProgress from './DeepSearchProgress.svelte';
 	import RawAnswerBlock from './RawAnswerBlock.svelte';
 	import { formatTime } from '$lib/utils/helpers';
@@ -53,6 +54,15 @@
 
 		<!-- Content -->
 		<div class="flex min-w-0 max-w-full flex-col {isUser ? 'items-end' : 'items-start'}">
+			{#if !isUser && message.isStreaming}
+				<ChatProgressStepper
+					phase={message.pipelinePhase ?? 'prepare'}
+					label={message.pipelineLabel ?? ''}
+					detail={message.pipelineDetail ?? ''}
+					mode={isDeepSearch ? 'deep' : 'chat'}
+				/>
+			{/if}
+
 			{#if isDeepSearch && message.deepSearchSteps && message.deepSearchSteps.length > 0}
 				<DeepSearchProgress steps={message.deepSearchSteps ?? []} isStreaming={!!message.isStreaming} />
 			{/if}
@@ -102,12 +112,13 @@
 				</div>
 			{/if}
 
+			{#if isUser || message.content || (message.isStreaming && !message.pipelinePhase)}
 			<div
 				class="rounded-2xl px-4 py-3 {isUser
 					? 'rounded-tr-sm bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-600/15'
 					: 'rounded-tl-sm border border-chat-border bg-chat-surface text-slate-200'}"
 			>
-				{#if message.isStreaming && !message.content}
+				{#if message.isStreaming && !message.content && !message.pipelinePhase}
 					<ThinkingIndicator
 						label={isDeepSearch ? 'Deep researching' : hasAnySources ? 'Analyzing sources' : 'Thinking'}
 					/>
@@ -142,6 +153,7 @@
 					{/if}
 				{/if}
 			</div>
+			{/if}
 
 			<div class="mt-1 flex items-center gap-2 px-1">
 				<span class="text-[10px] text-slate-600">{formatTime(message.timestamp)}</span>

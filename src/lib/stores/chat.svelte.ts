@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
-import type { Conversation, DeepSearchPresetId, DeepSearchSynthesisModeId, Message } from '$lib/types';
+import type { Conversation, DeepSearchPresetId, Message } from '$lib/types';
 import { streamChat, streamDeepSearch } from '$lib/services/api';
+import { llmStore } from '$lib/stores/llm.svelte';
 import { generateId, getCurrentDateContext, normalizeHttpUrl } from '$lib/utils/helpers';
 import { getItem, setItem } from '$lib/db';
 
@@ -14,9 +15,7 @@ class ChatStore {
 	deepSearchEnabled = $state(false);
 	/** Depth for the next deep-research request (server default: balanced). */
 	deepSearchPreset: DeepSearchPresetId = $state('balanced');
-	/** Final-answer strategy for the next deep-research request (server default: hybrid). */
-	deepSearchSynthesisMode: DeepSearchSynthesisModeId = $state('hybrid');
-	/** URLs to fetch before web search when sending a deep-research message. */
+	/** URLs to fetch as evidence when sending a deep-research message. */
 	deepSearchSeedUrls = $state<string[]>([]);
 	sidebarOpen = $state(true);
 	/** Bumped on streaming deltas so MessageList can auto-scroll (plain `content +=` / step pushes may not invalidate derived deps). */
@@ -107,7 +106,9 @@ class ChatStore {
 			content: '',
 			timestamp: new Date(),
 			isStreaming: true,
-			searchResults: []
+			searchResults: [],
+			pipelinePhase: 'prepare',
+			pipelineLabel: '질문 분석 중'
 		};
 		conv.messages.push(assistantMsg);
 
@@ -130,7 +131,17 @@ class ChatStore {
 			this.searchEnabled,
 			content.trim(),
 			currentDate,
+			llmStore.provider,
 			{
+				onProgress: (phase, label, detail) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].pipelinePhase = phase;
+						if (label !== undefined) c.messages[assistantIdx].pipelineLabel = label;
+						if (detail !== undefined) c.messages[assistantIdx].pipelineDetail = detail;
+						this.bumpScrollSync();
+					}
+				},
 				onToken: (token) => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
@@ -226,7 +237,9 @@ class ChatStore {
 			isStreaming: true,
 			isDeepSearch: true,
 			deepSearchSteps: [],
-			searchResults: []
+			searchResults: [],
+			pipelinePhase: 'prepare',
+			pipelineLabel: '딥 리서치 준비 중'
 		};
 		conv.messages.push(assistantMsg);
 
@@ -250,7 +263,17 @@ class ChatStore {
 			apiMessages,
 			content.trim(),
 			currentDate,
+			llmStore.provider,
 			{
+				onProgress: (phase, label, detail) => {
+					const c = this.conversations.find((c) => c.id === convId);
+					if (c && c.messages[assistantIdx]) {
+						c.messages[assistantIdx].pipelinePhase = phase;
+						if (label !== undefined) c.messages[assistantIdx].pipelineLabel = label;
+						if (detail !== undefined) c.messages[assistantIdx].pipelineDetail = detail;
+						this.bumpScrollSync();
+					}
+				},
 				onStep: (step) => {
 					const c = this.conversations.find((c) => c.id === convId);
 					if (c && c.messages[assistantIdx]) {
@@ -259,12 +282,12 @@ class ChatStore {
 						}
 						c.messages[assistantIdx].deepSearchSteps!.push(step);
 
-						// Collect sources (dedupe by URL) for SourceCard strip on the answer bubble
-						if (step.type === 'sources' && step.results) {
+						// Collect seed sources for SourceCard strip on the answer bubble
+						if (step.type === 'sources' && step.sourceResults) {
 							const existing = c.messages[assistantIdx].searchResults ?? [];
 							const seen = new Set(existing.map((r) => r.url));
 							const merged = [...existing];
-							for (const r of step.results) {
+							for (const r of step.sourceResults) {
 								if (!seen.has(r.url)) {
 									seen.add(r.url);
 									merged.push(r);
@@ -320,8 +343,7 @@ class ChatStore {
 			},
 			this.abortController.signal,
 			seeds,
-			this.deepSearchPreset,
-			this.deepSearchSynthesisMode
+			this.deepSearchPreset
 		);
 	}
 

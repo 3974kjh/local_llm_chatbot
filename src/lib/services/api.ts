@@ -1,11 +1,11 @@
-import type { DeepSearchStep, DeepSearchSynthesisModeId, SearchResult } from '$lib/types';
+import type { ChatPipelinePhase, DeepSearchStep, LlmProvider, SearchResult } from '$lib/types';
 import { getLocalCalendarDateYYYYMMDD } from '$lib/utils/helpers';
 
 export interface StreamCallbacks {
 	onToken: (token: string) => void;
 	onSources: (sources: SearchResult[]) => void;
-	/** Called once with formatted markdown of raw search results (no LLM opinion). */
 	onRawAnswer?: (content: string) => void;
+	onProgress?: (phase: ChatPipelinePhase, label?: string, detail?: string) => void;
 	onDone: () => void;
 	onError: (message: string) => void;
 }
@@ -13,12 +13,19 @@ export interface StreamCallbacks {
 export interface DeepSearchCallbacks {
 	onStep: (step: DeepSearchStep) => void;
 	onToken: (token: string) => void;
-	/** Called once with formatted markdown of raw research sources (no LLM opinion). */
 	onRawAnswer?: (content: string) => void;
-	/** When set, called with full markdown to replace streamed synthesis (citation finalize). */
 	onSynthesisFinal?: (content: string) => void;
+	onProgress?: (phase: ChatPipelinePhase, label?: string, detail?: string) => void;
 	onDone: () => void;
 	onError: (message: string) => void;
+}
+
+function handleProgress(
+	callbacks: { onProgress?: (phase: ChatPipelinePhase, label?: string, detail?: string) => void },
+	data: { phase?: ChatPipelinePhase; label?: string; detail?: string }
+): void {
+	if (!data.phase || !callbacks.onProgress) return;
+	callbacks.onProgress(data.phase, data.label, data.detail);
 }
 
 export async function streamChat(
@@ -26,6 +33,7 @@ export async function streamChat(
 	enableSearch: boolean,
 	query: string,
 	currentDate: string,
+	llmProvider: LlmProvider,
 	callbacks: StreamCallbacks,
 	signal?: AbortSignal
 ): Promise<void> {
@@ -38,7 +46,8 @@ export async function streamChat(
 				enableSearch,
 				query,
 				currentDate,
-				localeCalendarDate: getLocalCalendarDateYYYYMMDD()
+				localeCalendarDate: getLocalCalendarDateYYYYMMDD(),
+				llmProvider
 			}),
 			signal
 		});
@@ -66,23 +75,26 @@ export async function streamChat(
 
 				try {
 					const data = JSON.parse(line.slice(6));
-				switch (data.type) {
-					case 'token':
-						callbacks.onToken(data.content);
-						break;
-					case 'sources':
-						callbacks.onSources(data.data);
-						break;
-					case 'raw_answer':
-						callbacks.onRawAnswer?.(data.content);
-						break;
-					case 'done':
-						callbacks.onDone();
-						break;
-					case 'error':
-						callbacks.onError(data.message);
-						break;
-				}
+					switch (data.type) {
+						case 'progress':
+							handleProgress(callbacks, data);
+							break;
+						case 'token':
+							callbacks.onToken(data.content);
+							break;
+						case 'sources':
+							callbacks.onSources(data.data);
+							break;
+						case 'raw_answer':
+							callbacks.onRawAnswer?.(data.content);
+							break;
+						case 'done':
+							callbacks.onDone();
+							break;
+						case 'error':
+							callbacks.onError(data.message);
+							break;
+					}
 				} catch {
 					// skip malformed SSE data
 				}
@@ -112,11 +124,11 @@ export async function streamDeepSearch(
 	messages: Array<{ role: string; content: string }>,
 	query: string,
 	currentDate: string,
+	llmProvider: LlmProvider,
 	callbacks: DeepSearchCallbacks,
 	signal?: AbortSignal,
 	seedUrls?: string[],
-	preset?: string,
-	synthesisMode: DeepSearchSynthesisModeId = 'hybrid'
+	preset?: string
 ): Promise<void> {
 	try {
 		const response = await fetch('/api/deep-search', {
@@ -127,9 +139,9 @@ export async function streamDeepSearch(
 				query,
 				currentDate,
 				localeCalendarDate: getLocalCalendarDateYYYYMMDD(),
+				llmProvider,
 				seedUrls: seedUrls ?? [],
-				...(preset ? { preset } : {}),
-				synthesisMode
+				...(preset ? { preset } : {})
 			}),
 			signal
 		});
@@ -160,51 +172,100 @@ export async function streamDeepSearch(
 					switch (data.type) {
 						case 'keepalive':
 							break;
+						case 'progress':
+							handleProgress(callbacks, data);
+							break;
+						case 'start':
+							callbacks.onStep({
+								type: 'start',
+								preset: data.preset,
+								message: `${data.refineRounds} verification round(s)`
+							});
+							break;
+						case 'evidence_warning':
+							callbacks.onStep({ type: 'evidence_warning', message: data.message });
+							break;
 						case 'plan':
 							callbacks.onStep({
 								type: 'plan',
 								subQueries: data.subQueries,
 								strategy: data.strategy,
 								subQuestions: data.subQuestions,
-								stopCriteria: data.stopCriteria,
-								...(data.preset ? { preset: data.preset } : {})
-							});
-							break;
-						case 'iteration_start':
-							callbacks.onStep({
-								type: 'iteration_start',
-								iteration: data.iteration,
-								maxIterations: data.maxIterations,
-								totalUrlsFetched: data.totalUrlsFetched,
-								...(data.confidenceThreshold != null
-									? { confidenceThreshold: data.confidenceThreshold }
-									: {})
+								stopCriteria: data.stopCriteria
 							});
 							break;
 						case 'searching':
 							callbacks.onStep({ type: 'searching', query: data.query });
 							break;
-						case 'sources':
-							callbacks.onStep({ type: 'sources', results: data.results, query: data.query });
+						case 'web_search':
+							callbacks.onStep({
+								type: 'web_search',
+								round: data.round,
+								queries: data.queries,
+								pagesFetched: data.pagesFetched,
+								reason: data.reason
+							});
 							break;
-						case 'evaluation':
-							callbacks.onStep({ type: 'evaluation', thought: data.thought, needsMore: data.needsMore, refinedQueries: data.refinedQueries, confidence: data.confidence, resolvedItems: data.resolvedItems, unresolvedItems: data.unresolvedItems });
+						case 'draft':
+							callbacks.onStep({ type: 'draft', content: data.content });
+							break;
+						case 'refine_start':
+							callbacks.onStep({
+								type: 'refine_start',
+								round: data.round,
+								maxRounds: data.maxRounds
+							});
+							break;
+						case 'decompose':
+							callbacks.onStep({
+								type: 'decompose',
+								subQuestions: data.subQuestions,
+								claims: data.claims
+							});
+							break;
+						case 'verify':
+							callbacks.onStep({
+								type: 'verify',
+								claimResults: data.results,
+								confidence: data.confidence
+							});
+							break;
+						case 'refine':
+							callbacks.onStep({
+								type: 'refine',
+								thought: data.thought,
+								revisedDraft: data.revisedDraft,
+								confidence: data.confidence
+							});
+							break;
+						case 'sources':
+							callbacks.onStep({
+								type: 'sources',
+								sourceResults: data.results,
+								query: data.query,
+								isUserProvided: data.isUserProvided
+							});
 							break;
 						case 'complete':
-							callbacks.onStep({ type: 'complete', stopReason: data.stopReason, confidence: data.confidence });
+							callbacks.onStep({
+								type: 'complete',
+								stopReason: data.stopReason,
+								confidence: data.confidence,
+								totalPagesFetched: data.totalPagesFetched
+							});
 							break;
-					case 'synthesis_start':
-						callbacks.onStep({ type: 'synthesis_start' });
-						break;
-					case 'token':
-						callbacks.onToken(data.content);
-						break;
-					case 'raw_answer':
-						callbacks.onRawAnswer?.(data.content);
-						break;
-					case 'synthesis_final':
-						callbacks.onSynthesisFinal?.(data.content);
-						break;
+						case 'synthesis_start':
+							callbacks.onStep({ type: 'synthesis_start' });
+							break;
+						case 'token':
+							callbacks.onToken(data.content);
+							break;
+						case 'raw_answer':
+							callbacks.onRawAnswer?.(data.content);
+							break;
+						case 'synthesis_final':
+							callbacks.onSynthesisFinal?.(data.content);
+							break;
 						case 'done':
 							callbacks.onDone();
 							break;

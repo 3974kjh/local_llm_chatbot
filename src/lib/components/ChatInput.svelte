@@ -1,17 +1,12 @@
 <script lang="ts">
 	import { chatStore } from '$lib/stores/chat.svelte';
-	import type { DeepSearchPresetId, DeepSearchSynthesisModeId } from '$lib/types';
+	import { llmStore } from '$lib/stores/llm.svelte';
+	import type { DeepSearchPresetId } from '$lib/types';
 
 	const presetOptions: { id: DeepSearchPresetId; label: string; short: string }[] = [
-		{ id: 'fast', label: 'Fast', short: 'Fewer pages & rounds' },
-		{ id: 'balanced', label: 'Balanced', short: 'Default depth' },
-		{ id: 'deep', label: 'Deep', short: 'More pages & rounds' }
-	];
-
-	const synthesisModeOptions: { id: DeepSearchSynthesisModeId; label: string; short: string }[] = [
-		{ id: 'hybrid', label: 'Hybrid', short: 'Chunk map + final answer' },
-		{ id: 'chunked', label: 'Chunked', short: 'Smaller chunks, faster' },
-		{ id: 'raw-only', label: 'Raw only', short: 'Collected text only' }
+		{ id: 'fast', label: 'Fast', short: '1 verification round' },
+		{ id: 'balanced', label: 'Balanced', short: '2 verification rounds' },
+		{ id: 'deep', label: 'Deep', short: '4 verification rounds' }
 	];
 
 	let inputValue = $state('');
@@ -90,7 +85,7 @@
 	}
 </script>
 
-<div class="border-t border-chat-border bg-chat-surface/80 px-4 py-3 backdrop-blur-md">
+<div class="px-4 py-3">
 	<div class="mx-auto max-w-3xl">
 		<!-- Unified input container -->
 		<div
@@ -124,32 +119,7 @@
 						{/each}
 					</div>
 					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-						Answer mode
-					</p>
-					<div
-						class="mb-3 flex min-w-0 flex-wrap gap-1 rounded-lg border border-chat-border bg-chat-surface/80 p-0.5"
-						role="group"
-						aria-label="Deep research answer mode"
-					>
-						{#each synthesisModeOptions as opt (opt.id)}
-							<button
-								type="button"
-								disabled={chatStore.isGenerating}
-								onclick={() => {
-									chatStore.deepSearchSynthesisMode = opt.id;
-								}}
-								title={opt.short}
-								class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-center text-[11px] font-medium transition-all sm:flex-none sm:px-3 {chatStore.deepSearchSynthesisMode ===
-								opt.id
-									? 'bg-sky-600/90 text-white shadow-sm'
-									: 'text-slate-400 hover:bg-chat-raised hover:text-slate-200'}"
-							>
-								{opt.label}
-							</button>
-						{/each}
-					</div>
-					<p class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-						Attach pages (optional, analyzed first)
+						Attach source pages (recommended for fact-checking)
 					</p>
 					{#if chatStore.deepSearchSeedUrls.length > 0}
 						<div class="mb-2 flex min-w-0 flex-wrap gap-1.5">
@@ -296,7 +266,7 @@
 		</div>
 
 		<p class="mt-2 text-center text-[10px] text-slate-600">
-			Powered by Ollama &middot; llama3.1:8b &middot; Enter to send, Shift+Enter for new line
+			Powered by {llmStore.selectedOption.label} &middot; {llmStore.selectedOption.model} &middot; Enter to send, Shift+Enter for new line
 		</p>
 	</div>
 </div>

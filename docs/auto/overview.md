@@ -93,7 +93,7 @@ flowchart TD
 
 ## 참고
 
-- 스케줄 상태는 **서버 메모리**에만 존재합니다. 서버 재시작 후 `isActive`는 클라이언트에서 `false`로 초기화되며 스케줄을 다시 시작해야 합니다.
+- 스케줄 상태는 **서버 메모리**에만 존재합니다. 서버 재시작 후 `isActive`는 클라이언트에서 `false`로 초기화되며 스케줄을 다시 시작해야 합니다. 상세·복원 방안은 [scheduler-persistence.md](./scheduler-persistence.md)를 참고하세요.
 - 스케줄 실행 결과는 클라이언트가 15초마다 `GET /api/auto/status`를 폴링해 반영합니다.
 - 동시 LLM 실행은 서버에서 최대 2개(`MAX_CONCURRENT_LLM`)로 제한됩니다.
 - 번들 저장 키: IndexedDB `jukimbot-auto-bundles`.

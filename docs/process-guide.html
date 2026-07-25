@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JukimBot 프로세스 가이드</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --code-bg: #f1f5f9;
+      --nav-bg: #0f172a;
+      --nav-text: #f1f5f9;
+      --section-alt: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--nav-bg);
+      color: var(--nav-text);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      height: 52px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+      overflow-x: auto;
+    }
+    .top-nav .logo { font-weight: 700; font-size: 1rem; white-space: nowrap; }
+    .top-nav a {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: .9rem;
+      padding: .25rem .75rem;
+      border-radius: 4px;
+      transition: color .15s, background .15s;
+      white-space: nowrap;
+    }
+    .top-nav a:hover, .top-nav a.active { color: #fff; background: rgba(255,255,255,.1); }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem 2rem 4rem; }
+
+    .notice {
+      background: #fef9c3;
+      border: 1px solid #fde047;
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      font-size: .875rem;
+      margin-bottom: 2rem;
+      color: #713f12;
+    }
+    .notice code { background: rgba(0,0,0,.06); padding: .1em .4em; border-radius: 3px; }
+
+    .hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .hero h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: .5rem; }
+    .hero p { color: var(--muted); font-size: .95rem; }
+    .hero .meta { margin-top: 1rem; font-size: .8rem; color: var(--muted); }
+
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 2.5rem;
+    }
+    section h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      padding-bottom: .75rem;
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 1.5rem;
+    }
+    section h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 2rem 0 .75rem;
+      color: #334155;
+    }
+    section h4 {
+      font-size: .95rem;
+      font-weight: 600;
+      margin: 1.25rem 0 .5rem;
+      color: #475569;
+    }
+    section p { margin-bottom: .75rem; }
+    section ul, section ol { margin: .5rem 0 1rem 1.5rem; }
+    section li { margin-bottom: .35rem; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .875rem;
+      margin: 1rem 0 1.5rem;
+    }
+    th {
+      background: var(--section-alt);
+      text-align: left;
+      padding: .6rem .85rem;
+      border: 1px solid var(--border);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    td {
+      padding: .55rem .85rem;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #fafbfc; }
+
+    code {
+      font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+      font-size: .85em;
+      background: var(--code-bg);
+      padding: .15em .4em;
+      border-radius: 4px;
+      color: #be185d;
+    }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: .82rem;
+      margin: 1rem 0 1.5rem;
+      line-height: 1.5;
+    }
+    pre code { background: none; color: inherit; padding: 0; }
+
+    .diagram pre.mermaid,
+    .diagram-seq pre.mermaid {
+      background: transparent !important;
+      color: transparent !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 0;
+      overflow: visible;
+      font-size: 0;
+      line-height: 0;
+    }
+
+    .diagram {
+      background: var(--section-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem 1.5rem;
+      margin: 1.25rem 0 1.75rem;
+      overflow-x: auto;
+    }
+    .diagram .mermaid { display: flex; justify-content: center; }
+    .diagram .mermaid svg { max-width: none; height: auto; background: #ffffff; }
+
+    .diagram .mermaid svg text,
+    .diagram .mermaid svg tspan,
+    .diagram-seq .mermaid svg text,
+    .diagram-seq .mermaid svg tspan {
+      fill: #000000 !important;
+    }
+    .diagram .mermaid svg foreignObject div,
+    .diagram .mermaid svg foreignObject span,
+    .diagram .mermaid svg foreignObject p,
+    .diagram-seq .mermaid svg foreignObject div,
+    .diagram-seq .mermaid svg foreignObject span,
+    .diagram-seq .mermaid svg foreignObject p {
+      color: #000000 !important;
+    }
+    .diagram .mermaid svg .messageText,
+    .diagram .mermaid svg .messageText tspan,
+    .diagram .mermaid svg .actor tspan,
+    .diagram .mermaid svg .noteText,
+    .diagram .mermaid svg .noteText tspan,
+    .diagram .mermaid svg .loopText,
+    .diagram .mermaid svg .loopText tspan,
+    .diagram .mermaid svg .labelText,
+    .diagram .mermaid svg .labelText tspan,
+    .diagram .mermaid svg .sequenceNumber,
+    .diagram-seq .mermaid svg .messageText,
+    .diagram-seq .mermaid svg .messageText tspan,
+    .diagram-seq .mermaid svg .actor tspan,
+    .diagram-seq .mermaid svg .noteText,
+    .diagram-seq .mermaid svg .noteText tspan,
+    .diagram-seq .mermaid svg .loopText,
+    .diagram-seq .mermaid svg .loopText tspan,
+    .diagram-seq .mermaid svg .labelText,
+    .diagram-seq .mermaid svg .labelText tspan,
+    .diagram-seq .mermaid svg .sequenceNumber {
+      fill: #000000 !important;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-light);
+      padding: .85rem 1.1rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1rem 0 1.5rem;
+      font-size: .9rem;
+    }
+
+    .source-list { list-style: none; margin-left: 0; }
+    .source-list li {
+      padding: .3rem 0;
+      font-size: .875rem;
+      font-family: monospace;
+      color: #475569;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: .8rem;
+      padding: 1.5rem;
+    }
+
+    @media print {
+      .top-nav { display: none; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <span class="logo">JukimBot</span>
+  <a href="#auto-api-endpoints">1. Auto API</a>
+  <a href="#auto-execution-pipeline">2. Auto 실행 파이프라인</a>
+  <a href="#auto-overview">3. Auto 모드</a>
+  <a href="#chat-api-endpoints">4. Chat API</a>
+  <a href="#chat-overview">5. Chat 모드</a>
+</nav>
+
+<div class="container">
+
+  <div class="notice">
+    <strong>다이어그램이 보이지 않을 때:</strong> Mermaid CDN을 사용합니다.
+    파일을 직접 열었을 때(<code>file://</code>) 일부 브라우저에서 차단될 수 있습니다.
+    프로젝트 루트에서 <code>npx serve docs</code> 실행 후
+    <code>http://localhost:3000/process-guide.html</code> 로 접속하세요.
+  </div>
+
+  <div class="hero">
+    <h1>JukimBot 프로세스 가이드</h1>
+    <p>SvelteKit + Ollama 기반 로컬 LLM 채팅·자동화 앱입니다. Chat 모드는 스트리밍 대화와 웹 검색을, Auto 모드는 URL·웹 검색 기반 자동 분석과 스케줄 실행·메신저 전송을 제공합니다.</p>
+    <div class="meta">개정일: 2026-07-25 &nbsp;|&nbsp; JukimBot 코드 기준 &nbsp;|&nbsp; <code>docs/process-guide.html</code></div>
+  </div>
+
+  <section id="auto-api-endpoints">
+    <h2>1. Auto API</h2>
+
+    <h3>개요</h3>
+    <p>Auto 모드는 실행·스케줄·상태 조회·메신저 연동을 위한 <code>/api/auto/*</code> REST API를 제공합니다.</p>
+
+    <h3>목적</h3>
+    <ul>
+      <li>번들 즉시 실행 및 취소</li>
+      <li>서버 스케줄 시작·중지</li>
+      <li>스케줄 실행 결과 폴링</li>
+      <li>카카오 OAuth·텔레그램 테스트</li>
+    </ul>
+
+    <h3>주요 구성요소</h3>
+    <table>
+      <thead><tr><th>엔드포인트</th><th>역할</th><th>경로</th></tr></thead>
+      <tbody>
+        <tr><td>POST /api/auto/execute</td><td>Run Now</td><td>src/routes/api/auto/execute/+server.ts</td></tr>
+        <tr><td>POST /api/auto/execute/cancel</td><td>Run Now 취소</td><td>src/routes/api/auto/execute/cancel/+server.ts</td></tr>
+        <tr><td>POST /api/auto/schedule</td><td>스케줄 start/stop</td><td>src/routes/api/auto/schedule/+server.ts</td></tr>
+        <tr><td>GET /api/auto/status</td><td>스케줄 상태</td><td>src/routes/api/auto/status/+server.ts</td></tr>
+        <tr><td>/api/auto/kakao/*</td><td>카카오 OAuth·상태·테스트</td><td>src/routes/api/auto/kakao/</td></tr>
+        <tr><td>/api/auto/telegram/*</td><td>텔레그램 상태·테스트</td><td>src/routes/api/auto/telegram/</td></tr>
+      </tbody>
+    </table>
+
+    <h3>동작 흐름</h3>
+    <div class="diagram">
+      <pre class="mermaid">
+sequenceDiagram
+    participant UI as BundleEditor
+    participant Exec as /api/auto/execute
+    participant Sch as /api/auto/schedule
+    participant Status as /api/auto/status
+    participant Sched as scheduler.ts
+
+    UI->>Exec: Run Now bundle fields
+    Exec->>Sched: executeBundle signal
+    Exec-->>UI: researchResultText success
+
+    UI->>Sch: action start
+    Sch->>Sched: startSchedule
+    loop 15초 폴링
+        UI->>Status: GET
+        Status-->>UI: lastResult lastExecutedAt
+    end
+
+    UI->>Exec: POST cancel Stop Run
+    Exec->>Sched: abortRun bundleId
+      </pre>
+    </div>
+
+    <h3>사용 방법</h3>
+    <h4>POST /api/auto/execute</h4>
+    <p><code>title</code>, <code>autoApplyText</code> 필수. URL 1개 이상 또는 <code>enableWebSearch: true</code> 필요.</p>
+    <h4>POST /api/auto/execute/cancel</h4>
+    <p>요청: <code>{ "bundleId": "string" }</code> → 응답: <code>{ "success": true }</code></p>
+    <h4>POST /api/auto/schedule</h4>
+    <p><code>action: start</code> — 번들·스케줄 필드 전달. <code>action: stop</code> — <code>{ "action": "stop", "id": "bundleId" }</code></p>
+    <h4>GET /api/auto/status</h4>
+    <p>활성 스케줄 번들의 <code>isActive</code>, <code>isRunning</code>, <code>lastResult</code>, <code>lastExecutedAt</code> 반환.</p>
+
+    <h4>주요 소스 파일</h4>
+    <ul class="source-list">
+      <li>src/routes/api/auto/execute/+server.ts</li>
+      <li>src/routes/api/auto/execute/cancel/+server.ts</li>
+      <li>src/routes/api/auto/schedule/+server.ts</li>
+      <li>src/routes/api/auto/status/+server.ts</li>
+      <li>src/lib/stores/auto.svelte.ts — API 호출 클라이언트</li>
+    </ul>
+
+    <h3>참고</h3>
+    <p>카카오 OAuth 콜백 실패 시 <code>kakao=error&amp;msg=...</code> 쿼리로 리다이렉트됩니다.</p>
+  </section>
+
+  <section id="auto-execution-pipeline">
+    <h2>2. Auto 실행 파이프라인</h2>
+
+    <h3>개요</h3>
+    <p>Auto 번들 실행은 <code>executeBundle()</code> 함수(<code>src/lib/server/scheduler.ts</code>)에서 오케스트레이션됩니다. Run Now와 스케줄 실행 모두 동일 파이프라인을 사용하며, Run Now만 취소(Abort) 신호를 전달합니다.</p>
+
+    <h3>목적</h3>
+    <ul>
+      <li>URL·웹 검색·LLM·메신저 전송을 일관된 순서로 처리</li>
+      <li>Run Now 중단 시 fetch 단계와 전송 전 단계에서 취소 반영</li>
+      <li>OmniRoute 실패 시 로컬 Ollama로 자동 폴백</li>
+    </ul>
+
+    <h3>주요 구성요소</h3>
+    <table>
+      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
+      <tbody>
+        <tr><td>executeBundle</td><td>실행 파이프라인 본체</td><td>src/lib/server/scheduler.ts</td></tr>
+        <tr><td>fetchMultipleUrls</td><td>참조 URL 일괄 fetch</td><td>src/lib/server/scraper.ts</td></tr>
+        <tr><td>searchWeb</td><td>웹 검색</td><td>src/lib/server/search.ts</td></tr>
+        <tr><td>callLlmNonStreamingWithLocalFallback</td><td>비스트리밍 LLM + 로컬 폴백</td><td>src/lib/server/llm/index.ts</td></tr>
+        <tr><td>runAbortControllers</td><td>Run Now 취소용 Map</td><td>src/lib/server/scheduler.ts</td></tr>
+      </tbody>
+    </table>
+
+    <h3>동작 흐름</h3>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    START[executeBundle 시작] --> AB1{signal aborted?}
+    AB1 -->|yes| CANCEL[Cancelled 반환]
+    AB1 -->|no| URL[fetchMultipleUrls]
+    URL --> WS{enableWebSearch?}
+    WS -->|yes| SEARCH[searchWeb]
+    SEARCH --> TOP3[상위 3 URL fetch]
+    WS -->|no| VAL
+    TOP3 --> VAL{본문 또는 검색 결과?}
+    VAL -->|no| FAIL[오류 반환]
+    VAL -->|yes| LLM[callLlmNonStreamingWithLocalFallback]
+    LLM --> FB{omniroute 실패?}
+    FB -->|yes| LOCAL[로컬 Ollama 폴백]
+    FB -->|no| AB2
+    LOCAL --> AB2{signal aborted?}
+    AB2 -->|yes| CANCEL
+    AB2 -->|no| KAKAO{카카오 연결?}
+    KAKAO -->|yes| KS[sendMessageChunked]
+    KAKAO -->|no| AB3
+    KS --> AB3{signal aborted?}
+    AB3 -->|yes| CANCEL
+    AB3 -->|no| TG{telegramEnabled?}
+    TG -->|yes| TS[sendTelegramChunked]
+    TG -->|no| OK[success 반환]
+    TS --> OK
+      </pre>
+    </div>
+
+    <h4>주요 소스 파일</h4>
+    <ul class="source-list">
+      <li>src/lib/server/scheduler.ts — executeBundle, runTask, startSchedule</li>
+      <li>src/lib/server/scraper.ts — URL fetch</li>
+      <li>src/lib/server/search.ts — 웹 검색</li>
+      <li>src/lib/server/kakao.ts — 카카오 OAuth·전송</li>
+      <li>src/lib/server/telegram.ts — 텔레그램 Bot API</li>
+    </ul>
+
+    <h3>참고</h3>
+    <p>LLM 호출에는 abort signal이 전달되지 않습니다. 취소는 fetch 단계 또는 LLM 완료 후 전송 전에 반영됩니다.</p>
+  </section>
+
+  <section id="auto-overview">
+    <h2>3. Auto 모드</h2>
+
+    <h3>개요</h3>
+    <p>Auto 모드는 <strong>번들(Bundle)</strong> 단위로 URL 분석·웹 검색·LLM 요약을 자동 실행하고, 선택적으로 카카오톡·텔레그램으로 결과를 전송하는 자동화 기능입니다.</p>
+
+    <h3>목적</h3>
+    <ul>
+      <li>정기적으로 URL·웹 검색 기반 리서치를 자동화</li>
+      <li>분석 결과를 메신저로 배포</li>
+      <li>여러 번들을 독립적으로 관리·스케줄</li>
+    </ul>
+
+    <h3>주요 구성요소</h3>
+    <table>
+      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
+      <tbody>
+        <tr><td>AutoLayout</td><td>번들 목록, 카카오 연동 UI</td><td>src/lib/components/auto/AutoLayout.svelte</td></tr>
+        <tr><td>BundleEditor</td><td>번들 폼, Run Now, 스케줄</td><td>src/lib/components/auto/BundleEditor.svelte</td></tr>
+        <tr><td>autoStore</td><td>번들 CRUD, 실행·스케줄</td><td>src/lib/stores/auto.svelte.ts</td></tr>
+        <tr><td>scheduler</td><td>스케줄 엔진, executeBundle</td><td>src/lib/server/scheduler.ts</td></tr>
+      </tbody>
+    </table>
+
+    <h3>동작 흐름</h3>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    A[번들 생성/편집] --> B{실행 방식}
+    B -->|Run Now| C[POST /api/auto/execute]
+    B -->|Start Schedule| D[POST /api/auto/schedule start]
+    C --> E[executeBundle]
+    D --> F[서버 setInterval / 60s tick]
+    F --> E
+    E --> G[URL fetch]
+    G --> H{enableWebSearch?}
+    H -->|yes| I[searchWeb + 상위 3 URL fetch]
+    H -->|no| J[검증]
+    I --> J
+    J --> K[LLM 분석]
+    K --> L[카카오 전송]
+    L --> M[텔레그램 전송]
+    M --> N[결과 반환 + IndexedDB 저장]
+      </pre>
+    </div>
+
+    <h3>사용 방법</h3>
+    <h4>스케줄 유형</h4>
+    <table>
+      <thead><tr><th>유형</th><th>설정</th><th>동작</th></tr></thead>
+      <tbody>
+        <tr><td>minutes</td><td>30~1440분</td><td>setInterval, 시작 시 즉시 1회</td></tr>
+        <tr><td>daily</td><td>HH:mm</td><td>매일 지정 시각, 60초 tick</td></tr>
+        <tr><td>days</td><td>1~365일 + HH:mm</td><td>N일마다 지정 시각</td></tr>
+      </tbody>
+    </table>
+
+    <h4>주요 소스 파일</h4>
+    <ul class="source-list">
+      <li>src/lib/types/auto.ts — AutoBundle, ScheduleType</li>
+      <li>src/lib/stores/auto.svelte.ts — 클라이언트 상태</li>
+      <li>src/lib/components/auto/ — Auto UI</li>
+    </ul>
+
+    <h3>참고</h3>
+    <p>스케줄 상태는 서버 메모리에만 존재합니다. 번들 저장 키: IndexedDB <code>jukimbot-auto-bundles</code>.</p>
+  </section>
+
+  <section id="chat-api-endpoints">
+    <h2>4. Chat API</h2>
+
+    <h3>개요</h3>
+    <p>Chat 모드의 서버 API는 <code>POST /api/chat</code> 단일 엔드포인트로 SSE 스트리밍 응답을 반환합니다.</p>
+
+    <h3>목적</h3>
+    <ul>
+      <li>클라이언트와 LLM 사이의 스트리밍 중계</li>
+      <li>웹 검색·페이지 수집 결과를 SSE 이벤트로 전달</li>
+      <li>진행 단계(progress)를 실시간 UI에 반영</li>
+    </ul>
+
+    <h3>주요 구성요소</h3>
+    <table>
+      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
+      <tbody>
+        <tr><td>POST /api/chat</td><td>채팅 SSE 스트림</td><td>src/routes/api/chat/+server.ts</td></tr>
+        <tr><td>streamChat</td><td>클라이언트 fetch·SSE 파싱</td><td>src/lib/services/api.ts</td></tr>
+        <tr><td>GET /api/llm/health</td><td>LLM 제공자 연결 확인</td><td>src/routes/api/llm/health/+server.ts</td></tr>
+      </tbody>
+    </table>
+
+    <h3>동작 흐름</h3>
+    <div class="diagram">
+      <pre class="mermaid">
+sequenceDiagram
+    participant Client as chatStore
+    participant API as /api/chat
+    participant Search as searchWeb
+    participant LLM as createLlmStream
+
+    Client->>API: POST messages enableSearch query llmProvider
+    API-->>Client: progress prepare
+    alt enableSearch and query
+        API->>Search: searchWeb
+        API-->>Client: progress collect
+        API-->>Client: sources raw_answer
+        API-->>Client: progress analyze
+    end
+    API-->>Client: progress write
+    API->>LLM: systemPrompt + messages
+    loop 스트리밍
+        LLM-->>API: chunk
+        API-->>Client: token
+    end
+    API-->>Client: done
+    API-->>Client: progress complete
+      </pre>
+    </div>
+
+    <h3>사용 방법</h3>
+    <h4>SSE 이벤트 타입</h4>
+    <table>
+      <thead><tr><th>type</th><th>주요 필드</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>progress</td><td>phase, label, detail?</td><td>파이프라인 진행</td></tr>
+        <tr><td>sources</td><td>data: SearchResult[]</td><td>검색 결과</td></tr>
+        <tr><td>raw_answer</td><td>content</td><td>검색 기반 원문 마크다운</td></tr>
+        <tr><td>token</td><td>content</td><td>LLM 스트림 청크</td></tr>
+        <tr><td>done</td><td>—</td><td>스트림 종료</td></tr>
+        <tr><td>error</td><td>message</td><td>연결·타임아웃 오류</td></tr>
+      </tbody>
+    </table>
+
+    <h4>주요 소스 파일</h4>
+    <ul class="source-list">
+      <li>src/routes/api/chat/+server.ts — API 핸들러</li>
+      <li>src/lib/services/api.ts — streamChat 클라이언트</li>
+      <li>src/lib/server/llm/index.ts — createLlmStream</li>
+    </ul>
+  </section>
+
+  <section id="chat-overview">
+    <h2>5. Chat 모드</h2>
+
+    <h3>개요</h3>
+    <p>Chat 모드는 JukimBot 앱의 기본 대화 화면으로, 로컬 Ollama 또는 OmniRoute(OpenRouter) LLM과 스트리밍 채팅을 제공합니다. 선택적으로 웹 검색을 켜면 검색 결과와 페이지 본문을 수집한 뒤 LLM이 근거 기반 답변을 생성합니다.</p>
+
+    <h3>목적</h3>
+    <ul>
+      <li>로컬·클라우드 LLM을 전환하며 대화형 질의응답 제공</li>
+      <li>웹 검색·페이지 스크래핑으로 최신 정보 기반 답변 지원</li>
+      <li>대화 이력을 브라우저 IndexedDB에 저장해 세션 간 유지</li>
+    </ul>
+
+    <h3>주요 구성요소</h3>
+    <table>
+      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
+      <tbody>
+        <tr><td>ChatLayout</td><td>사이드바·헤더·메시지 목록·입력창</td><td>src/lib/components/ChatLayout.svelte</td></tr>
+        <tr><td>chatStore</td><td>대화 CRUD, 전송, IndexedDB</td><td>src/lib/stores/chat.svelte.ts</td></tr>
+        <tr><td>llmStore</td><td>LLM 제공자 선택</td><td>src/lib/stores/llm.svelte.ts</td></tr>
+        <tr><td>chat API</td><td>SSE 스트리밍, 검색·LLM</td><td>src/routes/api/chat/+server.ts</td></tr>
+      </tbody>
+    </table>
+
+    <h3>동작 흐름</h3>
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    A[사용자 메시지 전송] --> B[chatStore.sendMessage]
+    B --> C[POST /api/chat SSE]
+    C --> D[progress: 질문 분석]
+    D --> E{enableSearch?}
+    E -->|yes| F[searchWeb + fetchUrlContent]
+    F --> G[sources + raw_answer 이벤트]
+    E -->|no| H[검색 없는 시스템 프롬프트]
+    G --> I[progress: 답변 작성]
+    H --> I
+    I --> J[createLlmStream]
+    J --> K{provider}
+    K -->|local| L[Ollama]
+    K -->|omniroute| M[OmniRoute]
+    L --> N[token 스트림]
+    M --> N
+    N --> O[done + IndexedDB 저장]
+      </pre>
+    </div>
+
+    <h3>사용 방법</h3>
+    <h4>답변 깊이</h4>
+    <table>
+      <thead><tr><th>깊이</th><th>URL 수</th><th>페이지당 최대 문자</th></tr></thead>
+      <tbody>
+        <tr><td>brief</td><td>3</td><td>5,000</td></tr>
+        <tr><td>standard</td><td>5</td><td>8,000</td></tr>
+        <tr><td>comprehensive</td><td>8</td><td>12,000</td></tr>
+      </tbody>
+    </table>
+
+    <h4>주요 소스 파일</h4>
+    <ul class="source-list">
+      <li>src/routes/api/chat/+server.ts — Chat API</li>
+      <li>src/lib/stores/chat.svelte.ts — 클라이언트 상태</li>
+      <li>src/lib/server/answerDepth.ts — 답변 깊이 휴리스틱</li>
+      <li>src/lib/server/search.ts — 웹 검색</li>
+    </ul>
+
+    <h3>참고</h3>
+    <p>대화 데이터 키: IndexedDB <code>jukimbot-chat-conversations</code>. Chat API는 OmniRoute 실패 시 자동 로컬 폴백을 하지 않습니다.</p>
+  </section>
+
+</div>
+
+<footer>
+  JukimBot Process Guide &nbsp;·&nbsp; 2026-07-25 (개정) &nbsp;·&nbsp;
+  <code>docs/process-guide.html</code>
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: {
+      fontSize: '15px',
+      background: '#ffffff',
+      mainBkg: '#e0f2fe',
+      primaryColor: '#e0f2fe',
+      primaryTextColor: '#000000',
+      primaryBorderColor: '#2563eb',
+      secondaryColor: '#f1f5f9',
+      tertiaryColor: '#ffffff',
+      lineColor: '#475569',
+      textColor: '#000000',
+      actorBkg: '#e0f2fe',
+      actorTextColor: '#000000',
+      actorLineColor: '#2563eb',
+      actorBorder: '#2563eb',
+      signalColor: '#475569',
+      signalTextColor: '#000000',
+      labelBoxBkgColor: '#eff6ff',
+      labelBoxBorderColor: '#2563eb',
+      labelTextColor: '#000000',
+      noteBkgColor: '#fef9c3',
+      noteTextColor: '#000000',
+      noteBorderColor: '#f59e0b',
+      activationBkgColor: '#dbeafe',
+      activationBorderColor: '#2563eb',
+      sequenceNumberColor: '#000000'
+    },
+    flowchart: {
+      curve: 'basis',
+      htmlLabels: false,
+      useMaxWidth: false,
+      padding: 24,
+      nodeSpacing: 55,
+      rankSpacing: 80
+    },
+    sequence: {
+      useMaxWidth: false,
+      actorMargin: 80,
+      messageMargin: 40,
+      boxMargin: 12,
+      diagramMarginX: 30,
+      diagramMarginY: 20,
+      noteMargin: 12,
+      width: 180,
+      height: 50,
+      mirrorActors: false
+    }
+  });
+
+  const fixMermaidTextColors = () => {
+    document.querySelectorAll('.mermaid svg text, .mermaid svg tspan').forEach((el) => {
+      el.setAttribute('fill', '#000000');
+      el.style.fill = '#000000';
+    });
+    document.querySelectorAll('.mermaid svg foreignObject *').forEach((el) => {
+      el.style.color = '#000000';
+    });
+  };
+
+  mermaid.run()
+    .then(fixMermaidTextColors)
+    .catch(console.error);
+
+  const navLinks = document.querySelectorAll('.top-nav a');
+  const navTargets = [...navLinks]
+    .map((link) => {
+      const id = link.getAttribute('href')?.slice(1);
+      const el = id ? document.getElementById(id) : null;
+      return el ? { id, el } : null;
+    })
+    .filter(Boolean);
+
+  const updateActiveNav = () => {
+    const anchor = window.scrollY + window.innerHeight * 0.2;
+    let activeId = navTargets[0]?.id;
+    for (const { id, el } of navTargets) {
+      if (el.offsetTop <= anchor) {
+        activeId = id;
+      }
+    }
+    navLinks.forEach((link) => {
+      link.classList.toggle('active', link.getAttribute('href') === '#' + activeId);
+    });
+  };
+
+  window.addEventListener('scroll', updateActiveNav, { passive: true });
+  window.addEventListener('hashchange', updateActiveNav);
+  updateActiveNav();
+</script>
+
+</body>
+</html>

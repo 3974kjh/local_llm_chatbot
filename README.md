@@ -65,6 +65,8 @@ SvelteKit + Ollama/OpenRouter 기반 로컬 LLM 채팅 및 자동화(URL 분석�
 | [docs/process-guide.html](./docs/process-guide.html) | 통합 HTML 프로세스 가이드 (Mermaid 포함) |
 | [docs/chat/](./docs/chat/) | Chat 모드 (개요, API) |
 | [docs/auto/](./docs/auto/) | Auto 모드 (개요, 실행 파이프라인, API) |
+| [docs/deep-research/](./docs/deep-research/) | Deep Research (개요, 파이프라인, API) |
+| [docs/llm/](./docs/llm/) | LLM 제공자 (설정, 헬스체크, 폴백) |
 
 ---
 

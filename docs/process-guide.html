@@ -211,6 +211,108 @@
       fill: #000000 !important;
     }
 
+    .seq-steps { display: flex; flex-direction: column; gap: 2rem; margin: 1.5rem 0 2rem; }
+    section > .seq-step { margin: 1.25rem 0 1.75rem; }
+    .seq-step {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .seq-step-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+      color: #fff;
+    }
+    .seq-step-num {
+      flex-shrink: 0;
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 50%;
+      background: rgba(255,255,255,.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .seq-step-title { font-weight: 600; font-size: 1.05rem; }
+    .seq-step-desc { font-size: .85rem; opacity: .85; margin-top: .15rem; }
+    .diagram-seq {
+      padding: 2rem 2.5rem 2.5rem;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      background: #ffffff;
+      min-height: 220px;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+    .diagram-seq .mermaid { justify-content: flex-start; min-width: 100%; }
+    .diagram-seq .mermaid svg {
+      min-width: 900px;
+      font-size: 15px;
+      background: #ffffff;
+    }
+    .diagram-seq-flow .mermaid svg {
+      max-width: none;
+      width: auto;
+      height: auto;
+    }
+    .diagram-seq .mermaid svg .node rect,
+    .diagram-seq .mermaid svg .node polygon,
+    .diagram-seq .mermaid svg .cluster rect {
+      fill: #e0f2fe !important;
+      stroke: #2563eb !important;
+    }
+    .diagram-seq .mermaid svg .actor { fill: #e0f2fe !important; stroke: #2563eb !important; }
+    .diagram-seq .mermaid svg line,
+    .diagram-seq .mermaid svg .messageLine0,
+    .diagram-seq .mermaid svg .messageLine1 { stroke: #475569 !important; }
+    .diagram-seq .mermaid svg .note { fill: #fef9c3 !important; stroke: #f59e0b !important; }
+    .diagram-seq .mermaid svg .labelBox { fill: #eff6ff !important; stroke: #2563eb !important; }
+    .diagram .mermaid svg .actor { fill: #e0f2fe !important; stroke: #2563eb !important; }
+    .diagram .mermaid svg line { stroke: #475569 !important; }
+    .diagram .mermaid svg .node rect,
+    .diagram .mermaid svg .node polygon { fill: #e0f2fe !important; stroke: #2563eb !important; }
+
+    .step-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .step-nav a {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .4rem .85rem;
+      background: var(--accent-light);
+      color: var(--accent);
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      font-size: .82rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .step-nav a:hover { background: #dbeafe; }
+    .step-nav a .pill-num {
+      background: var(--accent);
+      color: #fff;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .7rem;
+      font-weight: 700;
+    }
+
     .callout {
       border-left: 4px solid var(--accent);
       background: var(--accent-light);
@@ -218,6 +320,14 @@
       border-radius: 0 8px 8px 0;
       margin: 1rem 0 1.5rem;
       font-size: .9rem;
+    }
+    .callout.warn {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .callout.danger {
+      border-color: #ef4444;
+      background: #fef2f2;
     }
 
     .source-list { list-style: none; margin-left: 0; }
@@ -245,11 +355,21 @@
 
 <nav class="top-nav">
   <span class="logo">JukimBot</span>
-  <a href="#auto-api-endpoints">1. Auto API</a>
+    <a href="#auto-api-endpoints">1. Auto API</a>
   <a href="#auto-execution-pipeline">2. Auto 실행 파이프라인</a>
   <a href="#auto-overview">3. Auto 모드</a>
-  <a href="#chat-api-endpoints">4. Chat API</a>
-  <a href="#chat-overview">5. Chat 모드</a>
+  <a href="#auto-scheduler-persistence">4. 스케줄러 영속화</a>
+  <a href="#chat-api-endpoints">5. Chat API</a>
+  <a href="#chat-overview">6. Chat 모드</a>
+  <a href="#deep-research-api-endpoints">7. Deep Research API</a>
+  <a href="#deep-research-overview">8. Deep Research</a>
+  <a href="#deep-research-pipeline">9. Deep Research 파이프라인</a>
+  <a href="#llm-health-and-fallback">10. LLM 헬스체크·폴백</a>
+  <a href="#llm-providers">11. LLM 제공자</a>
+  <a href="#messenger-kakao-oauth">12. 카카오 OAuth·메시지 전송</a>
+  <a href="#messenger-telegram-bot-api">13. 텔레그램 Bot API</a>
+  <a href="#storage-indexeddb-keys-migration">14. IndexedDB 키·마이그레이션</a>
+  <a href="#storage-server-file-storage">15. 서버 파일 저장</a>
 </nav>
 
 <div class="container">
@@ -263,40 +383,25 @@
 
   <div class="hero">
     <h1>JukimBot 프로세스 가이드</h1>
-    <p>SvelteKit + Ollama 기반 로컬 LLM 채팅·자동화 앱입니다. Chat 모드는 스트리밍 대화와 웹 검색을, Auto 모드는 URL·웹 검색 기반 자동 분석과 스케줄 실행·메신저 전송을 제공합니다.</p>
+    <p>SvelteKit + Ollama/OpenRouter 기반 로컬 LLM 채팅·자동화 앱입니다. Chat, Auto, Deep Research, LLM, Storage, Messenger 기능을 Mermaid 도식과 함께 설명합니다.</p>
     <div class="meta">개정일: 2026-07-25 &nbsp;|&nbsp; JukimBot 코드 기준 &nbsp;|&nbsp; <code>docs/process-guide.html</code></div>
   </div>
 
   <section id="auto-api-endpoints">
-    <h2>1. Auto API</h2>
-
-    <h3>개요</h3>
-    <p>Auto 모드는 실행·스케줄·상태 조회·메신저 연동을 위한 <code>/api/auto/*</code> REST API를 제공합니다.</p>
-
-    <h3>목적</h3>
-    <ul>
-      <li>번들 즉시 실행 및 취소</li>
-      <li>서버 스케줄 시작·중지</li>
-      <li>스케줄 실행 결과 폴링</li>
-      <li>카카오 OAuth·텔레그램 테스트</li>
-    </ul>
-
-    <h3>주요 구성요소</h3>
-    <table>
-      <thead><tr><th>엔드포인트</th><th>역할</th><th>경로</th></tr></thead>
-      <tbody>
-        <tr><td>POST /api/auto/execute</td><td>Run Now</td><td>src/routes/api/auto/execute/+server.ts</td></tr>
-        <tr><td>POST /api/auto/execute/cancel</td><td>Run Now 취소</td><td>src/routes/api/auto/execute/cancel/+server.ts</td></tr>
-        <tr><td>POST /api/auto/schedule</td><td>스케줄 start/stop</td><td>src/routes/api/auto/schedule/+server.ts</td></tr>
-        <tr><td>GET /api/auto/status</td><td>스케줄 상태</td><td>src/routes/api/auto/status/+server.ts</td></tr>
-        <tr><td>/api/auto/kakao/*</td><td>카카오 OAuth·상태·테스트</td><td>src/routes/api/auto/kakao/</td></tr>
-        <tr><td>/api/auto/telegram/*</td><td>텔레그램 상태·테스트</td><td>src/routes/api/auto/telegram/</td></tr>
-      </tbody>
-    </table>
-
-    <h3>동작 흐름</h3>
-    <div class="diagram">
-      <pre class="mermaid">
+  <h2>1. Auto API</h2>
+  <h3>개요</h3>
+  <p>Auto 모드는 실행·스케줄·상태 조회·메신저 연동을 위한 <code>/api/auto/*</code> REST API를 제공합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>번들 즉시 실행 및 취소</li>
+    <li>서버 스케줄 시작·중지</li>
+    <li>스케줄 실행 결과 폴링</li>
+    <li>카카오 OAuth·텔레그램 테스트</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>엔드포인트</th><th>역할</th><th>경로</th></tr></thead><tbody><tr><td>POST /api/auto/execute</td><td>Run Now</td><td><code>src/routes/api/auto/execute/+server.ts</code></td></tr><tr><td>POST /api/auto/execute/cancel</td><td>Run Now 취소</td><td><code>src/routes/api/auto/execute/cancel/+server.ts</code></td></tr><tr><td>POST /api/auto/schedule</td><td>스케줄 start/stop</td><td><code>src/routes/api/auto/schedule/+server.ts</code></td></tr><tr><td>GET /api/auto/status</td><td>스케줄 상태</td><td><code>src/routes/api/auto/status/+server.ts</code></td></tr><tr><td>/api/auto/kakao/*</td><td>카카오 OAuth·상태·테스트</td><td><code>src/routes/api/auto/kakao/</code></td></tr><tr><td>/api/auto/telegram/*</td><td>텔레그램 상태·테스트</td><td><code>src/routes/api/auto/telegram/</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant UI as BundleEditor
     participant Exec as /api/auto/execute
@@ -304,73 +409,95 @@ sequenceDiagram
     participant Status as /api/auto/status
     participant Sched as scheduler.ts
 
-    UI->>Exec: Run Now bundle fields
-    Exec->>Sched: executeBundle signal
-    Exec-->>UI: researchResultText success
+    UI->>Exec: Run Now (bundle fields)
+    Exec->>Sched: executeBundle(signal)
+    Exec-->>UI: researchResultText, success
 
     UI->>Sch: action start
     Sch->>Sched: startSchedule
     loop 15초 폴링
         UI->>Status: GET
-        Status-->>UI: lastResult lastExecutedAt
+        Status-->>UI: lastResult, lastExecutedAt
     end
 
-    UI->>Exec: POST cancel Stop Run
-    Exec->>Sched: abortRun bundleId
-      </pre>
-    </div>
+    UI->>Exec: POST cancel (Stop Run)
+    Exec->>Sched: abortRun(bundleId)
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>POST /api/auto/execute</h3>
+  <p><strong>요청 본문</strong></p>
+  <table><thead><tr><th>필드</th><th>필수</th><th>설명</th></tr></thead><tbody><tr><td><code>bundleId</code></td><td>권장</td><td>취소 API 연동용</td></tr><tr><td><code>title</code></td><td>O</td><td>번들 제목</td></tr><tr><td><code>autoApplyText</code></td><td>O</td><td>분석 프롬프트</td></tr><tr><td><code>autoReferUrl</code></td><td>—</td><td>URL 배열</td></tr><tr><td><code>enableWebSearch</code></td><td>—</td><td>웹 검색</td></tr><tr><td><code>telegramEnabled</code></td><td>—</td><td>텔레그램 전송</td></tr><tr><td><code>telegramBotToken</code></td><td>—</td><td>봇 토큰 (클라이언트에서 resolve)</td></tr><tr><td><code>telegramChatId</code></td><td>—</td><td>채팅 ID</td></tr><tr><td><code>llmProvider</code></td><td>—</td><td><code>local</code> / <code>omniroute</code></td></tr></tbody></table>
+  <p><strong>검증</strong>: <code>title</code>·<code>autoApplyText</code> 필수, URL 1개 이상 또는 <code>enableWebSearch: true</code></p>
+  <p><strong>응답 (200)</strong>: <code>executeBundle()</code> 결과 — <code>researchResultText</code>, <code>success</code>, <code>kakaoSent</code>, <code>telegramSent</code> 등</p>
+  <h3>POST /api/auto/execute/cancel</h3>
+  <p><strong>요청</strong>: <code>{ "bundleId": "string" }</code></p>
+  <p><strong>응답</strong>: <code>{ "success": true }</code></p>
+  <h3>POST /api/auto/schedule</h3>
+  <p><strong>action: <code>start</code></strong> — 번들 필드 + 스케줄 설정 전달</p>
+  <table><thead><tr><th>추가 필드</th><th>설명</th></tr></thead><tbody><tr><td><code>id</code></td><td>번들 ID</td></tr><tr><td><code>autoTimeSetting</code></td><td>분 단위 (minutes 모드)</td></tr><tr><td><code>scheduleType</code></td><td><code>minutes</code> / <code>daily</code> / <code>days</code></td></tr><tr><td><code>scheduleTime</code></td><td><code>HH:mm</code></td></tr><tr><td><code>scheduleDays</code></td><td>N일 (days 모드)</td></tr></tbody></table>
+  <p><strong>action: <code>stop</code></strong> — <code>{ "action": "stop", "id": "bundleId" }</code></p>
+  <p><strong>action: <code>stop-all</code></strong> — 모든 스케줄 중지 (UI 미사용)</p>
+  <h3>GET /api/auto/status</h3>
+  <p><strong>응답</strong>: 활성 스케줄 번들만 포함</p>
+  <pre><code>{
+  "&lt;bundleId&gt;": {
+    "isActive": true,
+    "isRunning": false,
+    "lastResult": "string | null",
+    "lastExecutedAt": "string | null"
+  }
+}</code></pre>
+  <h3>카카오 API</h3>
+  <table><thead><tr><th>경로</th><th>메서드</th><th>설명</th></tr></thead><tbody><tr><td><code>/api/auto/kakao/connect</code></td><td>GET</td><td>OAuth 리다이렉트 (<code>KAKAO_REST_API_KEY</code> 필요)</td></tr><tr><td><code>/api/auto/kakao/callback</code></td><td>GET</td><td>OAuth 콜백 → `/?mode=auto&amp;kakao=connected\</td><td>error`</td></tr><tr><td><code>/api/auto/kakao/status</code></td><td>GET</td><td><code>configured</code>, <code>connected</code>, <code>hasTokens</code>, <code>tokenExpired</code></td></tr><tr><td><code>/api/auto/kakao/test</code></td><td>POST</td><td>테스트 메모 전송</td></tr></tbody></table>
+  <h3>텔레그램 API</h3>
+  <table><thead><tr><th>경로</th><th>메서드</th><th>설명</th></tr></thead><tbody><tr><td><code>/api/auto/telegram/status</code></td><td>GET</td><td><code>{ configured }</code> — <code>.env</code> <code>TELEGRAM_BOT_TOKEN</code> 여부</td></tr><tr><td><code>/api/auto/telegram/test</code></td><td>POST</td><td><code>{ chatId, botToken? }</code> 테스트 전송</td></tr></tbody></table>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li><code>src/routes/api/auto/execute/+server.ts</code></li>
+    <li><code>src/routes/api/auto/execute/cancel/+server.ts</code></li>
+    <li><code>src/routes/api/auto/schedule/+server.ts</code></li>
+    <li><code>src/routes/api/auto/status/+server.ts</code></li>
+    <li>src/routes/api/auto/kakao/ — connect, callback, status, test</li>
+    <li>src/routes/api/auto/telegram/ — status, test</li>
+    <li>src/lib/stores/auto.svelte.ts — API 호출 클라이언트</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li><code>minutes</code> 스케줄 시작 시 <code>autoTimeSetting &gt;= 1</code> 검증</li>
+    <li>카카오 OAuth 콜백 실패 시 <code>kakao=error&amp;msg=...</code> 쿼리로 리다이렉트</li>
+    <li>텔레그램 테스트는 요청 본문의 <code>botToken</code>을 우선 사용 (없으면 <code>.env</code> 폴백)</li>
+  </ul>
+</section>
 
-    <h3>사용 방법</h3>
-    <h4>POST /api/auto/execute</h4>
-    <p><code>title</code>, <code>autoApplyText</code> 필수. URL 1개 이상 또는 <code>enableWebSearch: true</code> 필요.</p>
-    <h4>POST /api/auto/execute/cancel</h4>
-    <p>요청: <code>{ "bundleId": "string" }</code> → 응답: <code>{ "success": true }</code></p>
-    <h4>POST /api/auto/schedule</h4>
-    <p><code>action: start</code> — 번들·스케줄 필드 전달. <code>action: stop</code> — <code>{ "action": "stop", "id": "bundleId" }</code></p>
-    <h4>GET /api/auto/status</h4>
-    <p>활성 스케줄 번들의 <code>isActive</code>, <code>isRunning</code>, <code>lastResult</code>, <code>lastExecutedAt</code> 반환.</p>
-
-    <h4>주요 소스 파일</h4>
-    <ul class="source-list">
-      <li>src/routes/api/auto/execute/+server.ts</li>
-      <li>src/routes/api/auto/execute/cancel/+server.ts</li>
-      <li>src/routes/api/auto/schedule/+server.ts</li>
-      <li>src/routes/api/auto/status/+server.ts</li>
-      <li>src/lib/stores/auto.svelte.ts — API 호출 클라이언트</li>
-    </ul>
-
-    <h3>참고</h3>
-    <p>카카오 OAuth 콜백 실패 시 <code>kakao=error&amp;msg=...</code> 쿼리로 리다이렉트됩니다.</p>
-  </section>
-
-  <section id="auto-execution-pipeline">
-    <h2>2. Auto 실행 파이프라인</h2>
-
-    <h3>개요</h3>
-    <p>Auto 번들 실행은 <code>executeBundle()</code> 함수(<code>src/lib/server/scheduler.ts</code>)에서 오케스트레이션됩니다. Run Now와 스케줄 실행 모두 동일 파이프라인을 사용하며, Run Now만 취소(Abort) 신호를 전달합니다.</p>
-
-    <h3>목적</h3>
-    <ul>
-      <li>URL·웹 검색·LLM·메신저 전송을 일관된 순서로 처리</li>
-      <li>Run Now 중단 시 fetch 단계와 전송 전 단계에서 취소 반영</li>
-      <li>OmniRoute 실패 시 로컬 Ollama로 자동 폴백</li>
-    </ul>
-
-    <h3>주요 구성요소</h3>
-    <table>
-      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
-      <tbody>
-        <tr><td>executeBundle</td><td>실행 파이프라인 본체</td><td>src/lib/server/scheduler.ts</td></tr>
-        <tr><td>fetchMultipleUrls</td><td>참조 URL 일괄 fetch</td><td>src/lib/server/scraper.ts</td></tr>
-        <tr><td>searchWeb</td><td>웹 검색</td><td>src/lib/server/search.ts</td></tr>
-        <tr><td>callLlmNonStreamingWithLocalFallback</td><td>비스트리밍 LLM + 로컬 폴백</td><td>src/lib/server/llm/index.ts</td></tr>
-        <tr><td>runAbortControllers</td><td>Run Now 취소용 Map</td><td>src/lib/server/scheduler.ts</td></tr>
-      </tbody>
-    </table>
-
-    <h3>동작 흐름</h3>
-    <div class="diagram">
-      <pre class="mermaid">
+<section id="auto-execution-pipeline">
+  <h2>2. Auto 실행 파이프라인</h2>
+  <h3>개요</h3>
+  <p>Auto 번들 실행은 <code>executeBundle()</code> 함수(<code>src/lib/server/scheduler.ts</code>)에서 오케스트레이션됩니다. Run Now와 스케줄 실행 모두 동일 파이프라인을 사용하며, Run Now만 취소(Abort) 신호를 전달합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>URL·웹 검색·LLM·메신저 전송을 일관된 순서로 처리</li>
+    <li>Run Now 중단 시 fetch 단계와 전송 전 단계에서 취소 반영</li>
+    <li>OmniRoute 실패 시 로컬 Ollama로 자동 폴백</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>executeBundle</td><td>실행 파이프라인 본체</td><td><code>src/lib/server/scheduler.ts</code></td></tr><tr><td>fetchMultipleUrls</td><td>참조 URL 일괄 fetch</td><td><code>src/lib/server/scraper.ts</code></td></tr><tr><td>searchWeb</td><td>웹 검색 (SearXNG→Serper→DDG)</td><td><code>src/lib/server/search.ts</code></td></tr><tr><td>callLlmNonStreamingWithLocalFallback</td><td>비스트리밍 LLM + 로컬 폴백</td><td><code>src/lib/server/llm/index.ts</code></td></tr><tr><td>sendMessageChunked (Kakao)</td><td>카카오 메모 전송</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td>sendTelegramChunked</td><td>텔레그램 메시지 전송</td><td><code>src/lib/server/telegram.ts</code></td></tr><tr><td>runAbortControllers</td><td>Run Now 취소용 Map</td><td><code>src/lib/server/scheduler.ts</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <h3>단계별 처리</h3>
+  <ol>
+    <li><strong>취소 확인</strong> — <code>signal.aborted</code>이면 <code>{ success: false, error: 'Cancelled' }</code> 반환</li>
+    <li><strong>URL fetch</strong> — <code>fetchMultipleUrls(autoReferUrl, signal)</code>: URL당 20초 타임아웃, 최대 80,000자</li>
+    <li><strong>웹 검색</strong> (옵션) — 쿼리: `<code> </code>${autoApplyText} ${오늘 ISO 날짜}<code> </code><code>, </code>formatSearchContext()`로 스니펫 생성</li>
+    <li><strong>검색 URL fetch</strong> — 상위 3개 URL(참조 URL과 중복 제외), 본문 100자 초과만 유지</li>
+    <li><strong>검증</strong> — URL 본문과 검색 컨텍스트가 모두 없으면 오류 반환</li>
+    <li><strong>프롬프트 구성</strong> — 한국어 시스템 프롬프트 + 실행 일시·URL·검색 섹션</li>
+    <li><strong>LLM 호출</strong> — <code>maxTokens: 8192</code>, <code>temperature: 0.1</code>, 타임아웃 10분</li>
+    <li><strong>취소 확인</strong> (LLM 후)</li>
+    <li><strong>카카오 전송</strong> — <code>isKakaoConnected()</code>이고 결과 텍스트가 있으면 1,000자 청크, 500ms 간격</li>
+    <li><strong>취소 확인</strong> (텔레그램 전)</li>
+    <li><strong>텔레그램 전송</strong> — <code>telegramEnabled &amp;&amp; token &amp;&amp; chatId &amp;&amp; result</code>이면 4,000자 청크, 300ms 간격</li>
+  </ol>
+  <div class="diagram"><pre class="mermaid">
 flowchart TD
     START[executeBundle 시작] --> AB1{signal aborted?}
     AB1 -->|yes| CANCEL[Cancelled 반환]
@@ -396,49 +523,68 @@ flowchart TD
     TG -->|yes| TS[sendTelegramChunked]
     TG -->|no| OK[success 반환]
     TS --> OK
-      </pre>
-    </div>
+  </pre></div>
+  <h3>LLM 폴백</h3>
+  <p>OmniRoute 호출이 실패하거나 빈 응답이면 로컬 Ollama로 재시도하고, 결과 앞에 <code>buildLlmFallbackNotice()</code> 안내 문구를 붙입니다.</p>
+  <h3>취소 메커니즘 (Run Now만)</h3>
+  <table><thead><tr><th>계층</th><th>동작</th></tr></thead><tbody><tr><td>클라이언트</td><td><code>AbortController</code>로 fetch 중단 + <code>POST /api/auto/execute/cancel</code></td></tr><tr><td>서버</td><td><code>runAbortControllers</code> Map에 bundleId별 <code>AbortController</code> 등록</td></tr><tr><td>파이프라인</td><td><code>signal</code>을 URL fetch·웹 검색에 전달, LLM 전후·전송 전 abort 확인</td></tr><tr><td>LLM</td><td>abort signal 미전달 — LLM 완료 후 또는 fetch 단계에서 취소</td></tr></tbody></table>
+  <p>스케줄 실행은 <code>signal</code> 없이 호출되며 취소 API가 없습니다.</p>
+  <h3>사용 방법</h3>
+  <h3>실행 결과 객체</h3>
+  <pre><code>{
+  "researchResultText": "string",
+  "success": true,
+  "error": "string (optional)",
+  "kakaoSent": false,
+  "kakaoError": "string (optional)",
+  "telegramSent": false,
+  "telegramError": "string (optional)"
+}</code></pre>
+  <h3>결과 이력</h3>
+  <ul>
+    <li><code>resultHistory</code>: 최대 50건, <code>executedAt</code> + <code>result</code> 기준 중복 제거</li>
+    <li>Run Now 취소 시: <code>{ result: 'Cancelled', success: false }</code> 기록</li>
+  </ul>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/scheduler.ts — `executeBundle`, `runTask`, `startSchedule`, `stopSchedule`</li>
+    <li>src/lib/server/scraper.ts — URL fetch·HTML 텍스트 추출</li>
+    <li>src/lib/server/search.ts — 웹 검색</li>
+    <li>src/lib/server/llm/index.ts — LLM 라우팅·폴백</li>
+    <li>src/lib/server/kakao.ts — 카카오 OAuth·토큰(`.kakao-tokens.json`)·전송</li>
+    <li>src/lib/server/telegram.ts — 텔레그램 Bot API</li>
+    <li>src/routes/api/auto/execute/+server.ts — Run Now API</li>
+    <li>src/routes/api/auto/execute/cancel/+server.ts — 취소 API</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>카카오 토큰은 서버 파일 <code>.kakao-tokens.json</code>에 저장됩니다.</li>
+    <li><code>GET /api/auto/telegram/status</code>는 <code>.env</code>의 <code>TELEGRAM_BOT_TOKEN</code>만 확인하며, 번들별 토큰은 클라이언트에서 전달합니다.</li>
+    <li>번들 삭제 시 <code>forceStopOnServer()</code>로 서버 스케줄을 먼저 중지합니다.</li>
+  </ul>
+</section>
 
-    <h4>주요 소스 파일</h4>
-    <ul class="source-list">
-      <li>src/lib/server/scheduler.ts — executeBundle, runTask, startSchedule</li>
-      <li>src/lib/server/scraper.ts — URL fetch</li>
-      <li>src/lib/server/search.ts — 웹 검색</li>
-      <li>src/lib/server/kakao.ts — 카카오 OAuth·전송</li>
-      <li>src/lib/server/telegram.ts — 텔레그램 Bot API</li>
-    </ul>
-
-    <h3>참고</h3>
-    <p>LLM 호출에는 abort signal이 전달되지 않습니다. 취소는 fetch 단계 또는 LLM 완료 후 전송 전에 반영됩니다.</p>
-  </section>
-
-  <section id="auto-overview">
-    <h2>3. Auto 모드</h2>
-
-    <h3>개요</h3>
-    <p>Auto 모드는 <strong>번들(Bundle)</strong> 단위로 URL 분석·웹 검색·LLM 요약을 자동 실행하고, 선택적으로 카카오톡·텔레그램으로 결과를 전송하는 자동화 기능입니다.</p>
-
-    <h3>목적</h3>
-    <ul>
-      <li>정기적으로 URL·웹 검색 기반 리서치를 자동화</li>
-      <li>분석 결과를 메신저로 배포</li>
-      <li>여러 번들을 독립적으로 관리·스케줄</li>
-    </ul>
-
-    <h3>주요 구성요소</h3>
-    <table>
-      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
-      <tbody>
-        <tr><td>AutoLayout</td><td>번들 목록, 카카오 연동 UI</td><td>src/lib/components/auto/AutoLayout.svelte</td></tr>
-        <tr><td>BundleEditor</td><td>번들 폼, Run Now, 스케줄</td><td>src/lib/components/auto/BundleEditor.svelte</td></tr>
-        <tr><td>autoStore</td><td>번들 CRUD, 실행·스케줄</td><td>src/lib/stores/auto.svelte.ts</td></tr>
-        <tr><td>scheduler</td><td>스케줄 엔진, executeBundle</td><td>src/lib/server/scheduler.ts</td></tr>
-      </tbody>
-    </table>
-
-    <h3>동작 흐름</h3>
-    <div class="diagram">
-      <pre class="mermaid">
+<section id="auto-overview">
+  <h2>3. Auto 모드</h2>
+  <h3>개요</h3>
+  <p>Auto 모드는 <strong>번들(Bundle)</strong> 단위로 URL 분석·웹 검색·LLM 요약을 자동 실행하고, 선택적으로 카카오톡·텔레그램으로 결과를 전송하는 자동화 기능입니다. 즉시 실행(Run Now)과 서버 스케줄(분·일·N일)을 지원합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>정기적으로 URL·웹 검색 기반 리서치를 자동화</li>
+    <li>분석 결과를 메신저로 배포</li>
+    <li>여러 번들을 독립적으로 관리·스케줄</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>AutoLayout</td><td>번들 목록, 카카오 연동 UI, 사이드바</td><td><code>src/lib/components/auto/AutoLayout.svelte</code></td></tr><tr><td>BundleEditor</td><td>번들 폼, Run Now, 스케줄 on/off</td><td><code>src/lib/components/auto/BundleEditor.svelte</code></td></tr><tr><td>TelegramSettingsModal</td><td>텔레그램 봇·수신처 CRUD</td><td><code>src/lib/components/auto/TelegramSettingsModal.svelte</code></td></tr><tr><td>autoStore</td><td>번들 CRUD, 실행·스케줄, 폴링</td><td><code>src/lib/stores/auto.svelte.ts</code></td></tr><tr><td>scheduler</td><td>스케줄 엔진, <code>executeBundle</code></td><td><code>src/lib/server/scheduler.ts</code></td></tr><tr><td>telegramConfigsStore</td><td>봇·채팅 설정 (클라이언트)</td><td><code>src/lib/stores/telegramConfigs.svelte.ts</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <ol>
+    <li>사용자가 번들을 생성·편집합니다 (제목, 프롬프트, URL, 웹 검색, 텔레그램, LLM 제공자, 스케줄).</li>
+    <li><strong>Run Now</strong> 또는 <strong>Start Schedule</strong>로 서버에 실행을 요청합니다.</li>
+    <li>서버가 URL fetch → (옵션) 웹 검색 → LLM 분석 → (옵션) 카카오·텔레그램 전송을 수행합니다.</li>
+    <li>결과는 번들의 <code>researchResultText</code>와 <code>resultHistory</code>(최대 50건)에 저장됩니다.</li>
+  </ol>
+  <div class="diagram"><pre class="mermaid">
 flowchart TD
     A[번들 생성/편집] --> B{실행 방식}
     B -->|Run Now| C[POST /api/auto/execute]
@@ -455,69 +601,188 @@ flowchart TD
     K --> L[카카오 전송]
     L --> M[텔레그램 전송]
     M --> N[결과 반환 + IndexedDB 저장]
-      </pre>
-    </div>
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>번들 필드</h3>
+  <table><thead><tr><th>필드</th><th>설명</th></tr></thead><tbody><tr><td><code>title</code></td><td>고유 제목 (필수)</td></tr><tr><td><code>autoApplyText</code></td><td>LLM 분석 프롬프트 (필수)</td></tr><tr><td><code>autoReferUrl</code></td><td>참조 URL 목록</td></tr><tr><td><code>enableWebSearch</code></td><td>웹 검색 on/off</td></tr><tr><td><code>telegramEnabled</code></td><td>텔레그램 전송 on/off</td></tr><tr><td><code>telegramBotId</code> / <code>telegramChatId</code></td><td>텔레그램 설정 모달에서 등록한 봇·수신처 ID</td></tr><tr><td><code>llmProvider</code></td><td><code>local</code> 또는 <code>omniroute</code></td></tr><tr><td><code>scheduleType</code></td><td><code>minutes</code> / <code>daily</code> / <code>days</code></td></tr></tbody></table>
+  <p>실행 조건: URL 1개 이상 <strong>또는</strong> <code>enableWebSearch: true</code> 중 하나는 반드시 필요합니다.</p>
+  <h3>스케줄 유형</h3>
+  <table><thead><tr><th>유형</th><th>설정</th><th>동작</th></tr></thead><tbody><tr><td><code>minutes</code></td><td>30~1440분 슬라이더</td><td><code>setInterval</code>로 N분마다 실행. 시작 시 즉시 1회 실행(동시 LLM 2개 미만일 때)</td></tr><tr><td><code>daily</code></td><td><code>HH:mm</code></td><td>매일 지정 시각, 60초 tick으로 확인</td></tr><tr><td><code>days</code></td><td>1~365일 + <code>HH:mm</code></td><td>N일마다 지정 시각</td></tr></tbody></table>
+  <h3>Run Now / Stop Run</h3>
+  <ul>
+    <li><strong>Run Now</strong>: 저장 없이 현재 폼 값으로 즉시 실행합니다.</li>
+    <li><strong>Stop Run</strong>: <code>POST /api/auto/execute/cancel</code> + 클라이언트 <code>AbortController</code>로 중단합니다.</li>
+    <li>실행·스케줄 활성 중에는 번들 설정이 잠깁니다 (<code>settingsLocked</code>).</li>
+  </ul>
+  <h3>메신저</h3>
+  <ul>
+    <li><strong>카카오</strong>: 전역 OAuth 연동. 연결되어 있으면 모든 성공 실행 결과가 카카오로 전송됩니다 (번들별 설정 없음).</li>
+    <li><strong>텔레그램</strong>: 번들별 on/off. 봇 토큰·채팅 ID는 클라이언트 IndexedDB에 저장됩니다.</li>
+  </ul>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/types/auto.ts — `AutoBundle`, `ScheduleType` 타입</li>
+    <li>src/lib/stores/auto.svelte.ts — 클라이언트 상태</li>
+    <li>src/lib/server/scheduler.ts — 스케줄·실행 엔진</li>
+    <li>src/lib/components/auto/ — Auto UI 컴포넌트</li>
+    <li>src/routes/api/auto/ — Auto API 라우트</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>스케줄 상태는 <strong>서버 메모리</strong>에만 존재합니다. 서버 재시작 후 <code>isActive</code>는 클라이언트에서 <code>false</code>로 초기화되며 스케줄을 다시 시작해야 합니다. 상세·복원 방안은 [scheduler-persistence.md](./scheduler-persistence.md)를 참고하세요.</li>
+    <li>스케줄 실행 결과는 클라이언트가 15초마다 <code>GET /api/auto/status</code>를 폴링해 반영합니다.</li>
+    <li>동시 LLM 실행은 서버에서 최대 2개(<code>MAX_CONCURRENT_LLM</code>)로 제한됩니다.</li>
+    <li>번들 저장 키: IndexedDB <code>jukimbot-auto-bundles</code>.</li>
+  </ul>
+</section>
 
-    <h3>사용 방법</h3>
-    <h4>스케줄 유형</h4>
-    <table>
-      <thead><tr><th>유형</th><th>설정</th><th>동작</th></tr></thead>
-      <tbody>
-        <tr><td>minutes</td><td>30~1440분</td><td>setInterval, 시작 시 즉시 1회</td></tr>
-        <tr><td>daily</td><td>HH:mm</td><td>매일 지정 시각, 60초 tick</td></tr>
-        <tr><td>days</td><td>1~365일 + HH:mm</td><td>N일마다 지정 시각</td></tr>
-      </tbody>
-    </table>
+<section id="auto-scheduler-persistence">
+  <h2>4. 스케줄러 영속화</h2>
+  <h3>개요</h3>
+  <p>Auto 스케줄은 서버 프로세스 메모리(<code>activeTasks</code> Map)에만 존재합니다. SvelteKit 개발 서버 재시작·배포·HMR로 <code>scheduler.ts</code> 모듈이 다시 로드되면 모든 타이머와 실행 상태가 사라지며, 클라이언트는 별도 복원 로직 없이 <code>isActive</code>를 <code>false</code>로 초기화합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>현재 스케줄 저장·복원 동작과 한계를 명확히 기록</li>
+    <li>서버 재시작 후 발생하는 클라이언트-서버 상태 불일치를 설명</li>
+    <li>코드베이스 구조에 맞는 복원 방안을 <strong>설계 참고</strong>로 정리 (아래 방안은 모두 <strong>미구현</strong>)</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td><code>activeTasks</code></td><td>실행 중 스케줄 Map (메모리 전용)</td><td><code>src/lib/server/scheduler.ts</code></td></tr><tr><td><code>startSchedule</code> / <code>stopSchedule</code></td><td>스케줄 등록·해제</td><td><code>src/lib/server/scheduler.ts</code></td></tr><tr><td><code>getAllTaskStatuses</code></td><td>활성 스케줄 상태 조회</td><td><code>src/lib/server/scheduler.ts</code></td></tr><tr><td><code>POST /api/auto/schedule</code></td><td>클라이언트 → 서버 스케줄 제어</td><td><code>src/routes/api/auto/schedule/+server.ts</code></td></tr><tr><td><code>GET /api/auto/status</code></td><td>폴링용 상태 API</td><td><code>src/routes/api/auto/status/+server.ts</code></td></tr><tr><td><code>autoStore</code></td><td>번들·<code>isActive</code> UI 상태</td><td><code>src/lib/stores/auto.svelte.ts</code></td></tr><tr><td>IndexedDB <code>jukimbot-auto-bundles</code></td><td>번들 설정 영구 저장 (클라이언트)</td><td><code>src/lib/stores/auto.svelte.ts</code></td></tr></tbody></table>
+  <h3>현재 구현 (메모리 전용)</h3>
+  <h3>서버 `ScheduledTask`</h3>
+  <p><code>startSchedule()</code> 호출 시 <code>activeTasks</code>에 등록되는 객체입니다.</p>
+  <table><thead><tr><th>필드</th><th>영속 가능</th><th>설명</th></tr></thead><tbody><tr><td><code>id</code>, <code>title</code>, <code>autoApplyText</code>, <code>autoReferUrl</code></td><td>O</td><td>번들 실행 설정</td></tr><tr><td><code>autoTimeSetting</code>, <code>scheduleType</code>, <code>scheduleTime</code>, <code>scheduleDays</code></td><td>O</td><td>스케줄 주기</td></tr><tr><td><code>enableWebSearch</code>, <code>telegramEnabled</code>, <code>llmProvider</code></td><td>O</td><td>실행 옵션</td></tr><tr><td><code>telegramBotToken</code>, <code>telegramChatId</code></td><td>O</td><td>스케줄 시작 시 클라이언트가 resolve한 값</td></tr><tr><td><code>timer</code></td><td>X</td><td><code>setInterval</code> 핸들 (런타임)</td></tr><tr><td><code>nextRunAt</code></td><td>△</td><td><code>daily</code>/<code>days</code> 모드 다음 실행 시각 (재계산 가능)</td></tr><tr><td><code>lastResult</code>, <code>lastExecutedAt</code></td><td>△</td><td>실행 이력 (복원 시 선택)</td></tr><tr><td><code>isRunning</code>, <code>executionCount</code></td><td>X</td><td>런타임 상태</td></tr></tbody></table>
+  <h3>스케줄 유형별 타이머</h3>
+  <table><thead><tr><th><code>scheduleType</code></th><th>서버 타이머</th><th>동작</th></tr></thead><tbody><tr><td><code>minutes</code></td><td>번들별 <code>setInterval</code></td><td>N분마다 <code>runTask</code>, 시작 시 즉시 1회 실행(동시 LLM 2개 미만)</td></tr><tr><td><code>daily</code></td><td>공유 60초 tick (<code>timeBasedTickTimer</code>)</td><td><code>nextRunAt</code> 도달 시 실행 후 다음날 같은 시각 재설정</td></tr><tr><td><code>days</code></td><td>공유 60초 tick</td><td><code>lastExecutedAt</code> + N일 후 같은 시각 재설정</td></tr></tbody></table>
+  <p>모듈 로드 시 로그: <code>[Scheduler] Module loaded/reloaded - activeTasks is fresh (empty)</code>.</p>
+  <h3>클라이언트 번들 저장</h3>
+  <ul>
+    <li>번들 설정은 IndexedDB 키 <code>jukimbot-auto-bundles</code>에 JSON으로 저장됩니다.</li>
+    <li><code>loadFromStorage()</code>는 <strong>항상</strong> <code>isActive: false</code>, <code>isExecuting: false</code>로 덮어씁니다 (<code>auto.svelte.ts</code> 478행). 저장된 JSON에 <code>isActive: true</code>가 있어도 로드 시 무시됩니다.</li>
+    <li><code>startBundle()</code> 성공 시 <code>isActive = true</code>로 <code>persist()</code>하지만, 페이지 새로고침·재방문 시 다시 <code>false</code>입니다.</li>
+  </ul>
+  <h3>서버 재시작 시 영향</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    participant User
+    participant Client as autoStore (브라우저)
+    participant Server as scheduler.ts
+    participant IDB as IndexedDB
 
-    <h4>주요 소스 파일</h4>
-    <ul class="source-list">
-      <li>src/lib/types/auto.ts — AutoBundle, ScheduleType</li>
-      <li>src/lib/stores/auto.svelte.ts — 클라이언트 상태</li>
-      <li>src/lib/components/auto/ — Auto UI</li>
-    </ul>
+    User->>Client: Start Schedule
+    Client->>Server: POST /api/auto/schedule start
+    Server->>Server: activeTasks.set + setInterval
+    Client->>Client: isActive = true, persist()
+    Client->>IDB: 번들 저장 (isActive true 포함)
 
-    <h3>참고</h3>
-    <p>스케줄 상태는 서버 메모리에만 존재합니다. 번들 저장 키: IndexedDB <code>jukimbot-auto-bundles</code>.</p>
-  </section>
+    Note over Server: 서버 재시작 / HMR / 배포
+    Server->>Server: activeTasks = Map() (비움)
+    Server->>Server: 모든 timer 소실
 
-  <section id="chat-api-endpoints">
-    <h2>4. Chat API</h2>
+    User->>Client: 페이지 로드
+    Client->>IDB: loadFromStorage()
+    Client->>Client: isActive := false (강제)
+    Note over Client,Server: UI는 Stop Schedule 표시 안 함<br/>서버에는 스케줄 없음
+  </pre></div>
+  <table><thead><tr><th>항목</th><th>재시작 전</th><th>재시작 후</th></tr></thead><tbody><tr><td>서버 <code>activeTasks</code></td><td>등록된 스케줄·타이머</td><td>빈 Map</td></tr><tr><td>서버 <code>lastResult</code> / <code>lastExecutedAt</code></td><td>메모리에 보관</td><td>소실</td></tr><tr><td>클라이언트 <code>isActive</code></td><td><code>true</code> (실행 중 UI)</td><td><code>false</code> (강제 초기화)</td></tr><tr><td>IndexedDB 번들 설정</td><td>유지</td><td>유지</td></tr><tr><td>카카오 토큰 (<code>.kakao-tokens.json</code>)</td><td>유지</td><td>유지 (별도 파일)</td></tr><tr><td>텔레그램 봇 토큰</td><td>IndexedDB</td><td>유지</td></tr></tbody></table>
+  <h3>폴링 동작</h3>
+  <p><code>autoStore</code>는 15초마다 <code>GET /api/auto/status</code>를 호출합니다. 재시작 후 서버에 활성 태스크가 없으면 빈 객체 <code>{}</code>가 반환되며, 클라이언트는 새 실행 결과를 받지 못합니다.</p>
+  <h3>수동 복구 (현재 유일한 방법)</h3>
+  <p>사용자가 Auto UI에서 해당 번들의 <strong>Start Schedule</strong>을 다시 눌러 <code>POST /api/auto/schedule</code> <code>action: start</code>를 호출해야 합니다. 브라우저 탭이 열려 있지 않으면 스케줄은 복구되지 않습니다.</p>
+  <h3>클라이언트-서버 상태 불일치</h3>
+  <p>재시작 직후 페이지를 새로고침하지 않은 경우:</p>
+  <ul>
+    <li>UI에 <code>isActive: true</code>(녹색 표시)가 남아 있을 수 있으나 서버에는 스케줄이 없습니다.</li>
+    <li><code>GET /api/auto/status</code>는 해당 <code>bundleId</code>를 반환하지 않아 폴링으로 결과가 갱신되지 않습니다.</li>
+    <li><strong>Stop Schedule</strong>을 누르면 <code>stopSchedule(id)</code>가 no-op(이미 없음)이고, 클라이언트만 <code>isActive: false</code>로 정리됩니다.</li>
+  </ul>
+  <p>번들 삭제 시 <code>forceStopOnServer()</code>가 <code>action: stop</code>을 호출해 서버 스케줄을 먼저 중지합니다.</p>
+  <div class="callout danger"><strong>복원 방안 (미구현)</strong></div>
+  <p>아래는 현재 코드에 <strong>구현되어 있지 않은</strong> 설계 옵션입니다. 구현 시 보안·운영 요구사항에 맞게 선택합니다.</p>
+  <h3>방안 A: 클라이언트 재등록 (권장 — 변경 범위 작음)</h3>
+  <p><strong>개요</strong>: IndexedDB에 스케줄 활성 플래그를 유지하고, 앱 로드 시 서버에 <code>start</code>를 다시 보냅니다.</p>
+  <table><thead><tr><th>단계</th><th>내용</th></tr></thead><tbody><tr><td>1</td><td><code>loadFromStorage()</code>에서 저장된 <code>isActive</code>를 복원 (또는 <code>scheduleEnabled</code> 필드 분리)</td></tr><tr><td>2</td><td><code>constructor</code> 또는 <code>onMount</code> 후 <code>bundles.filter(b =&gt; b.isActive)</code>에 대해 <code>startBundle(id)</code> 호출</td></tr><tr><td>3</td><td><code>telegramConfigsStore</code>에서 봇·채팅 resolve 후 기존과 동일한 <code>POST /api/auto/schedule</code> 본문 전송</td></tr></tbody></table>
+  <p><strong>장점</strong>: 서버 파일·DB 불필요, 기존 API 재사용   <strong>단점</strong>: 브라우저가 한 번은 열려 있어야 함 (완전 무인 서버 스케줄 아님)   <strong>주의</strong>: 텔레그램 토큰은 클라이언트 IndexedDB에만 있으므로 서버 단독 복원 불가</p>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+    LOAD[페이지 로드] --> IDB[IndexedDB 번들 로드]
+    IDB --> CHECK{isActive 번들?}
+    CHECK -->|yes| RESOLVE[텔레그램 봇/채팅 resolve]
+    RESOLVE --> API[POST /api/auto/schedule start]
+    API --> SERVER[activeTasks 재등록]
+    CHECK -->|no| DONE[완료]
+    SERVER --> DONE
+  </pre></div>
+  <h3>방안 B: 서버 파일 영속화 (카카오 토큰 패턴)</h3>
+  <p><strong>개요</strong>: <code>.kakao-tokens.json</code>과 유사하게 <code>.jukimbot-schedules.json</code>에 직렬화 가능한 스케줄 목록을 저장합니다.</p>
+  <table><thead><tr><th>단계</th><th>내용</th></tr></thead><tbody><tr><td>1</td><td><code>startSchedule</code> / <code>stopSchedule</code> 시 파일 동기화 (<code>timer</code>·<code>isRunning</code> 제외)</td></tr><tr><td>2</td><td>SvelteKit <code>hooks.server.ts</code> 또는 모듈 init에서 파일 로드 후 <code>startSchedule</code> 재호출</td></tr><tr><td>3</td><td><code>.gitignore</code>에 스케줄 파일 추가 (텔레그램 토큰 포함 가능)</td></tr></tbody></table>
+  <p><strong>장점</strong>: 브라우저 없이 서버 재시작 후에도 스케줄 자동 재개   <strong>단점</strong>: 텔레그램 토큰이 서버 디스크에 평문 저장; 다중 인스턴스·수평 확장 시 파일 경합   <strong>참고</strong>: <code>src/lib/server/kakao.ts</code>의 <code>loadTokens</code> / <code>saveTokens</code> 패턴 재사용 가능</p>
+  <h3>방안 C: 하이브리드 (서버 스냅샷 + 클라이언트 보조)</h3>
+  <p><strong>개요</strong>: 서버는 스케줄 메타데이터만 파일에 저장하고, 텔레그램 토큰 없는 번들만 서버 단독 복원. 토큰 필요 번들은 클라이언트 접속 시 방안 A로 보완.</p>
+  <p><strong>장점</strong>: 민감 정보 최소화 + 부분 무인 복원   <strong>단점</strong>: 두 경로 유지·동기화 복잡도 증가</p>
+  <h3>방안 D: 외부 스케줄러 (아키텍처 변경)</h3>
+  <p>cron·systemd·클라우드 스케줄러가 <code>POST /api/auto/execute</code>를 주기 호출합니다. 서버 <code>setInterval</code> 스케줄러를 사용하지 않습니다.</p>
+  <p><strong>장점</strong>: 프로세스 재시작과 무관, 운영 도구 표준화   <strong>단점</strong>: Auto UI 스케줄 on/off와 별도 운영; 현재 <code>schedule</code> API·<code>activeTasks</code> 설계와 이중화</p>
+  <h3>구현 시 체크리스트</h3>
+  <table><thead><tr><th>항목</th><th>설명</th></tr></thead><tbody><tr><td><code>nextRunAt</code> 재계산</td><td><code>daily</code>/<code>days</code> 복원 시 <code>getNextRunDaily</code> / <code>getNextRunDays</code>로 누락 실행 여부 결정</td></tr><tr><td>동시 실행 제한</td><td><code>MAX_CONCURRENT_LLM = 2</code> — 복원 직후 다수 immediate 실행 시 지연 로직 유지</td></tr><tr><td>HMR</td><td>개발 중 <code>scheduler.ts</code> 수정만으로도 스케줄 소실 — 방안 A/B 모두 고려</td></tr><tr><td><code>stop-all</code></td><td><code>POST /api/auto/schedule</code> <code>action: stop-all</code>은 UI 미사용; 영속화 시 파일도 비워야 함</td></tr><tr><td>보안</td><td>서버 파일에 <code>telegramBotToken</code> 저장 시 <code>.gitignore</code>·파일 권한 필수</td></tr></tbody></table>
+  <h3>사용 방법</h3>
+  <h3>운영자 (현재)</h3>
+  <ol>
+    <li>서버 재시작·배포 후 Auto 화면을 엽니다.</li>
+    <li>스케줄이 필요한 번들마다 <strong>Start Schedule</strong>을 다시 누릅니다.</li>
+    <li>카카오 연동은 <code>.kakao-tokens.json</code>이 유지되면 재연동 없이 전송 가능합니다.</li>
+  </ol>
+  <h3>개발자 (복원 구현 시)</h3>
+  <ul>
+    <li>최소 변경: <strong>방안 A</strong> — <code>auto.svelte.ts</code>의 <code>loadFromStorage</code> + 초기화 후 <code>startBundle</code> 루프</li>
+    <li>무인 서버: <strong>방안 B</strong> — <code>hooks.server.ts</code> 추가 + <code>scheduler.ts</code>에 파일 I/O</li>
+  </ul>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/scheduler.ts — `activeTasks`, `startSchedule`, `stopSchedule`, `getAllTaskStatuses`</li>
+    <li>src/routes/api/auto/schedule/+server.ts — 스케줄 start/stop API</li>
+    <li>src/routes/api/auto/status/+server.ts — 상태 폴링 API</li>
+    <li>src/lib/stores/auto.svelte.ts — `isActive` 초기화·`startBundle`·폴링</li>
+    <li>src/lib/types/auto.ts — `AutoBundle`, `BundleStatus`</li>
+    <li>docs/storage/server-file-storage.md — 서버 파일 저장 (카카오 토큰) 패턴</li>
+    <li>docs/auto/overview.md — Auto 스케줄 유형 개요</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>SvelteKit <code>hooks.server.ts</code>는 현재 프로젝트에 <strong>없습니다</strong>. 서버 기동 시 복원 로직을 넣으려면 신규 추가가 필요합니다.</li>
+    <li><code>isActive</code>는 클라이언트 UI 전용에 가깝고 서버 <code>getTaskStatus().isActive</code>는 항상 <code>true</code>(Map에 존재할 때)입니다.</li>
+    <li>스케줄 실행은 Run Now와 달리 <code>AbortSignal</code>·취소 API를 지원하지 않습니다 (<code>docs/auto/execution-pipeline.md</code>).</li>
+  </ul>
+</section>
 
-    <h3>개요</h3>
-    <p>Chat 모드의 서버 API는 <code>POST /api/chat</code> 단일 엔드포인트로 SSE 스트리밍 응답을 반환합니다.</p>
-
-    <h3>목적</h3>
-    <ul>
-      <li>클라이언트와 LLM 사이의 스트리밍 중계</li>
-      <li>웹 검색·페이지 수집 결과를 SSE 이벤트로 전달</li>
-      <li>진행 단계(progress)를 실시간 UI에 반영</li>
-    </ul>
-
-    <h3>주요 구성요소</h3>
-    <table>
-      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
-      <tbody>
-        <tr><td>POST /api/chat</td><td>채팅 SSE 스트림</td><td>src/routes/api/chat/+server.ts</td></tr>
-        <tr><td>streamChat</td><td>클라이언트 fetch·SSE 파싱</td><td>src/lib/services/api.ts</td></tr>
-        <tr><td>GET /api/llm/health</td><td>LLM 제공자 연결 확인</td><td>src/routes/api/llm/health/+server.ts</td></tr>
-      </tbody>
-    </table>
-
-    <h3>동작 흐름</h3>
-    <div class="diagram">
-      <pre class="mermaid">
+<section id="chat-api-endpoints">
+  <h2>5. Chat API</h2>
+  <h3>개요</h3>
+  <p>Chat 모드의 서버 API는 <code>POST /api/chat</code> 단일 엔드포인트로 SSE(Server-Sent Events) 스트리밍 응답을 반환합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>클라이언트와 LLM 사이의 스트리밍 중계</li>
+    <li>웹 검색·페이지 수집 결과를 SSE 이벤트로 전달</li>
+    <li>진행 단계(progress)를 실시간 UI에 반영</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>POST /api/chat</td><td>채팅 SSE 스트림</td><td><code>src/routes/api/chat/+server.ts</code></td></tr><tr><td>streamChat</td><td>클라이언트 fetch·SSE 파싱</td><td><code>src/lib/services/api.ts</code></td></tr><tr><td>pipeLlmChatStream</td><td>LLM 스트림 → token 이벤트 변환</td><td><code>src/lib/server/llm/streamParsers.ts</code></td></tr><tr><td>GET /api/llm/health</td><td>LLM 제공자 연결 확인</td><td><code>src/routes/api/llm/health/+server.ts</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant Client as chatStore
     participant API as /api/chat
     participant Search as searchWeb
     participant LLM as createLlmStream
 
-    Client->>API: POST messages enableSearch query llmProvider
+    Client->>API: POST messages, enableSearch, query, llmProvider
     API-->>Client: progress prepare
-    alt enableSearch and query
+    alt enableSearch && query
         API->>Search: searchWeb
         API-->>Client: progress collect
-        API-->>Client: sources raw_answer
+        API-->>Client: sources, raw_answer
         API-->>Client: progress analyze
     end
     API-->>Client: progress write
@@ -528,58 +793,59 @@ sequenceDiagram
     end
     API-->>Client: done
     API-->>Client: progress complete
-      </pre>
-    </div>
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>POST /api/chat</h3>
+  <p><strong>요청 본문 (JSON)</strong></p>
+  <table><thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead><tbody><tr><td><code>messages</code></td><td><code>{ role, content }[]</code></td><td>대화 이력 (<code>user</code> / <code>assistant</code>)</td></tr><tr><td><code>enableSearch</code></td><td><code>boolean</code></td><td>웹 검색 활성화</td></tr><tr><td><code>query</code></td><td><code>string</code></td><td>검색 쿼리 (보통 최신 사용자 메시지)</td></tr><tr><td><code>currentDate</code></td><td><code>string</code></td><td>날짜 컨텍스트</td></tr><tr><td><code>localeCalendarDate</code></td><td><code>string</code></td><td><code>YYYY-MM-DD</code> 클라이언트 달력 날짜</td></tr><tr><td><code>llmProvider</code></td><td>`'local' \</td><td>'omniroute'`</td><td>LLM 제공자</td></tr></tbody></table>
+  <p><strong>응답</strong>: <code>Content-Type: text/event-stream</code>, 각 이벤트는 <code>data: {JSON}\n\n</code> 형식</p>
+  <h3>SSE 이벤트 타입</h3>
+  <table><thead><tr><th>type</th><th>주요 필드</th><th>설명</th></tr></thead><tbody><tr><td><code>progress</code></td><td><code>phase</code>, <code>label</code>, <code>detail?</code></td><td>파이프라인 진행 (<code>prepare</code> / <code>collect</code> / <code>analyze</code> / <code>write</code> / <code>complete</code>)</td></tr><tr><td><code>sources</code></td><td><code>data: SearchResult[]</code></td><td>검색 결과 (<code>title</code>, <code>url</code>, <code>snippet</code>)</td></tr><tr><td><code>raw_answer</code></td><td><code>content</code></td><td>검색 기반 원문 마크다운 (AI 요약 전)</td></tr><tr><td><code>token</code></td><td><code>content</code></td><td>LLM 스트림 청크</td></tr><tr><td><code>done</code></td><td>—</td><td>스트림 종료</td></tr><tr><td><code>error</code></td><td><code>message</code></td><td>연결·타임아웃 오류</td></tr></tbody></table>
+  <h3>progress 단계 (서버)</h3>
+  <table><thead><tr><th>phase</th><th>label (예시)</th><th>조건</th></tr></thead><tbody><tr><td><code>prepare</code></td><td>질문 분석 중</td><td>항상</td></tr><tr><td><code>collect</code></td><td>웹 검색 중 / 완료, 페이지 읽는 중</td><td><code>enableSearch &amp;&amp; query</code></td></tr><tr><td><code>analyze</code></td><td>출처 정리 중</td><td>검색 수행 후</td></tr><tr><td><code>write</code></td><td>답변 작성 중</td><td>LLM 호출 전</td></tr><tr><td><code>complete</code></td><td>완료</td><td>LLM 스트림 종료 후</td></tr></tbody></table>
+  <h3>GET /api/llm/health</h3>
+  <p><strong>쿼리</strong>: <code>provider=local|omniroute</code></p>
+  <p><strong>응답</strong>: <code>{ ok: boolean }</code></p>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/routes/api/chat/+server.ts — API 핸들러</li>
+    <li>src/lib/services/api.ts — `streamChat` 클라이언트</li>
+    <li>src/lib/server/llm/index.ts — `createLlmStream`, `pipeLlmChatStream`</li>
+    <li>src/lib/server/llm/ollamaProvider.ts — Ollama (`OLLAMA_URL`, `OLLAMA_MODEL`)</li>
+    <li>src/lib/server/llm/omnirouteProvider.ts — OmniRoute (`OMNIROUTE_BASE_URL`, `OMNIROUTE_MODEL`)</li>
+    <li>src/routes/api/llm/health/+server.ts — 헬스체크</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>클라이언트 <code>AbortController</code>로 중단 시 <code>AbortError</code>가 발생하며 <code>onDone()</code>으로 처리됩니다.</li>
+    <li>비정상 HTTP 응답 시 <code>Server error: {status} {statusText}</code> 메시지가 표시됩니다.</li>
+    <li>Ollama 기본 URL: <code>http://localhost:11434</code>, 기본 모델: <code>llama3.1:8b</code>.</li>
+    <li>OmniRoute 기본 URL: <code>http://localhost:20128/v1</code>, 인증: <code>OMNIROUTE_API_KEY</code> 또는 <code>LLM_API_KEY</code>.</li>
+  </ul>
+</section>
 
-    <h3>사용 방법</h3>
-    <h4>SSE 이벤트 타입</h4>
-    <table>
-      <thead><tr><th>type</th><th>주요 필드</th><th>설명</th></tr></thead>
-      <tbody>
-        <tr><td>progress</td><td>phase, label, detail?</td><td>파이프라인 진행</td></tr>
-        <tr><td>sources</td><td>data: SearchResult[]</td><td>검색 결과</td></tr>
-        <tr><td>raw_answer</td><td>content</td><td>검색 기반 원문 마크다운</td></tr>
-        <tr><td>token</td><td>content</td><td>LLM 스트림 청크</td></tr>
-        <tr><td>done</td><td>—</td><td>스트림 종료</td></tr>
-        <tr><td>error</td><td>message</td><td>연결·타임아웃 오류</td></tr>
-      </tbody>
-    </table>
-
-    <h4>주요 소스 파일</h4>
-    <ul class="source-list">
-      <li>src/routes/api/chat/+server.ts — API 핸들러</li>
-      <li>src/lib/services/api.ts — streamChat 클라이언트</li>
-      <li>src/lib/server/llm/index.ts — createLlmStream</li>
-    </ul>
-  </section>
-
-  <section id="chat-overview">
-    <h2>5. Chat 모드</h2>
-
-    <h3>개요</h3>
-    <p>Chat 모드는 JukimBot 앱의 기본 대화 화면으로, 로컬 Ollama 또는 OmniRoute(OpenRouter) LLM과 스트리밍 채팅을 제공합니다. 선택적으로 웹 검색을 켜면 검색 결과와 페이지 본문을 수집한 뒤 LLM이 근거 기반 답변을 생성합니다.</p>
-
-    <h3>목적</h3>
-    <ul>
-      <li>로컬·클라우드 LLM을 전환하며 대화형 질의응답 제공</li>
-      <li>웹 검색·페이지 스크래핑으로 최신 정보 기반 답변 지원</li>
-      <li>대화 이력을 브라우저 IndexedDB에 저장해 세션 간 유지</li>
-    </ul>
-
-    <h3>주요 구성요소</h3>
-    <table>
-      <thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead>
-      <tbody>
-        <tr><td>ChatLayout</td><td>사이드바·헤더·메시지 목록·입력창</td><td>src/lib/components/ChatLayout.svelte</td></tr>
-        <tr><td>chatStore</td><td>대화 CRUD, 전송, IndexedDB</td><td>src/lib/stores/chat.svelte.ts</td></tr>
-        <tr><td>llmStore</td><td>LLM 제공자 선택</td><td>src/lib/stores/llm.svelte.ts</td></tr>
-        <tr><td>chat API</td><td>SSE 스트리밍, 검색·LLM</td><td>src/routes/api/chat/+server.ts</td></tr>
-      </tbody>
-    </table>
-
-    <h3>동작 흐름</h3>
-    <div class="diagram">
-      <pre class="mermaid">
+<section id="chat-overview">
+  <h2>6. Chat 모드</h2>
+  <h3>개요</h3>
+  <p>Chat 모드는 JukimBot 앱의 기본 대화 화면으로, 로컬 Ollama 또는 OmniRoute(OpenRouter) LLM과 스트리밍 채팅을 제공합니다. 선택적으로 웹 검색을 켜면 검색 결과와 페이지 본문을 수집한 뒤 LLM이 근거 기반 답변을 생성합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>로컬·클라우드 LLM을 전환하며 대화형 질의응답 제공</li>
+    <li>웹 검색·페이지 스크래핑으로 최신 정보 기반 답변 지원</li>
+    <li>대화 이력을 브라우저 IndexedDB에 저장해 세션 간 유지</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>ChatLayout</td><td>사이드바·헤더·메시지 목록·입력창 레이아웃</td><td><code>src/lib/components/ChatLayout.svelte</code></td></tr><tr><td>ChatInput</td><td>메시지 입력, Web 검색 토글, 생성 중단</td><td><code>src/lib/components/ChatInput.svelte</code></td></tr><tr><td>MessageBubble</td><td>사용자·어시스턴트 버블, 소스 카드, 원문 답변</td><td><code>src/lib/components/MessageBubble.svelte</code></td></tr><tr><td>ChatProgressStepper</td><td>5단계 진행 표시 (준비→수집→분석→작성→완료)</td><td><code>src/lib/components/ChatProgressStepper.svelte</code></td></tr><tr><td>chatStore</td><td>대화 CRUD, 전송, 스트리밍 상태, IndexedDB 영속</td><td><code>src/lib/stores/chat.svelte.ts</code></td></tr><tr><td>llmStore</td><td>LLM 제공자 선택 (<code>local</code> / <code>omniroute</code>)</td><td><code>src/lib/stores/llm.svelte.ts</code></td></tr><tr><td>chat API</td><td>SSE 스트리밍, 검색·LLM 파이프라인</td><td><code>src/routes/api/chat/+server.ts</code></td></tr><tr><td>LLM 라우터</td><td>Ollama·OmniRoute 스트림 생성</td><td><code>src/lib/server/llm/index.ts</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <ol>
+    <li>사용자가 <code>ChatInput</code>에서 메시지를 전송합니다.</li>
+    <li><code>chatStore.sendMessage()</code>가 사용자 메시지와 스트리밍 중인 어시스턴트 메시지를 추가합니다.</li>
+    <li>최근 완료된 메시지 최대 20개를 <code>POST /api/chat</code>에 전달합니다.</li>
+    <li>서버가 진행 단계(<code>progress</code>)를 SSE로 전송하며, 웹 검색이 켜져 있으면 검색·페이지 수집을 수행합니다.</li>
+    <li>LLM 스트림 토큰(<code>token</code>)이 클라이언트에 전달되고, 완료 시 <code>done</code> 이벤트 후 IndexedDB에 저장합니다.</li>
+  </ol>
+  <div class="diagram"><pre class="mermaid">
 flowchart TD
     A[사용자 메시지 전송] --> B[chatStore.sendMessage]
     B --> C[POST /api/chat SSE]
@@ -592,36 +858,870 @@ flowchart TD
     H --> I
     I --> J[createLlmStream]
     J --> K{provider}
-    K -->|local| L[Ollama]
-    K -->|omniroute| M[OmniRoute]
+    K -->|local| L[Ollama /api/chat]
+    K -->|omniroute| M[OmniRoute /chat/completions]
     L --> N[token 스트림]
     M --> N
     N --> O[done + IndexedDB 저장]
-      </pre>
-    </div>
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>대화 관리</h3>
+  <ul>
+    <li><strong>New Chat</strong>: 새 대화 생성. 첫 메시지 전송 시 제목이 메시지 앞 50자로 자동 설정됩니다.</li>
+    <li><strong>대화 선택·삭제</strong>: 사이드바에서 선택하거나 삭제합니다.</li>
+    <li><strong>메시지 초기화</strong>: 헤더 휴지통 아이콘으로 현재 대화 메시지만 비웁니다.</li>
+  </ul>
+  <h3>웹 검색</h3>
+  <ul>
+    <li>입력창 <strong>Web</strong> 토글로 활성화합니다 (기본값: 켜짐).</li>
+    <li>검색 쿼리는 사용자 메시지에 클라이언트 달력 날짜(<code>localeCalendarDate</code>)가 붙습니다.</li>
+    <li>검색 제공자 우선순위: SearXNG → Serper → DuckDuckGo.</li>
+  </ul>
+  <h3>LLM 제공자</h3>
+  <ul>
+    <li>사이드바에서 <strong>Local</strong> (<code>llama3.1:8b</code>, Ollama) 또는 <strong>OpenRouter</strong> (<code>omniroute</code>)를 선택합니다.</li>
+    <li>선택값은 <code>localStorage</code> 키 <code>jukimbot-llm-provider</code>에 저장됩니다.</li>
+    <li>앱 마운트 시 <code>GET /api/llm/health?provider=...</code>로 연결 상태를 확인합니다.</li>
+  </ul>
+  <h3>답변 깊이</h3>
+  <p>질문 길이·키워드에 따라 <code>brief</code> / <code>standard</code> / <code>comprehensive</code> 깊이가 자동 결정되며, 수집 URL 수·페이지 문자 수·<code>num_predict</code>가 달라집니다 (<code>src/lib/server/answerDepth.ts</code>).</p>
+  <table><thead><tr><th>깊이</th><th>URL 수</th><th>페이지당 최대 문자</th></tr></thead><tbody><tr><td>brief</td><td>3</td><td>5,000</td></tr><tr><td>standard</td><td>5</td><td>8,000</td></tr><tr><td>comprehensive</td><td>8</td><td>12,000</td></tr></tbody></table>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/routes/api/chat/+server.ts — Chat API 핸들러</li>
+    <li>src/lib/stores/chat.svelte.ts — 클라이언트 상태·전송 로직</li>
+    <li>src/lib/services/api.ts — `streamChat` SSE 파서</li>
+    <li>src/lib/chatPipeline.ts — 진행 단계 라벨 정의</li>
+    <li>src/lib/server/chatProgress.ts — 서버 progress 이벤트 헬퍼</li>
+    <li>src/lib/server/llm/ — Ollama·OmniRoute 제공자</li>
+    <li>src/lib/server/search.ts — 웹 검색</li>
+    <li>src/lib/server/scraper.ts — URL 본문 추출</li>
+    <li>src/lib/types/index.ts — `Message`, `Conversation` 타입</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>Chat 모드는 Deep Research(<code>/api/deep-search</code>)와 별도 경로입니다. Deep 모드는 이 문서 범위 밖입니다.</li>
+    <li>Chat API는 OmniRoute 실패 시 자동 로컬 폴백을 하지 않습니다 (Auto 실행과 다름).</li>
+    <li>대화 데이터 키: IndexedDB <code>jukimbot-chat-conversations</code> (<code>jukimbot-db</code> / store <code>kv</code>).</li>
+  </ul>
+</section>
 
-    <h3>사용 방법</h3>
-    <h4>답변 깊이</h4>
-    <table>
-      <thead><tr><th>깊이</th><th>URL 수</th><th>페이지당 최대 문자</th></tr></thead>
-      <tbody>
-        <tr><td>brief</td><td>3</td><td>5,000</td></tr>
-        <tr><td>standard</td><td>5</td><td>8,000</td></tr>
-        <tr><td>comprehensive</td><td>8</td><td>12,000</td></tr>
-      </tbody>
-    </table>
+<section id="deep-research-api-endpoints">
+  <h2>7. Deep Research API</h2>
+  <h3>개요</h3>
+  <p>Deep Research는 <code>POST /api/deep-search</code> 단일 엔드포인트로 SSE 스트리밍 응답을 반환합니다. 파이프라인 각 단계의 진행·중간 결과·최종 답변이 이벤트로 전달됩니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>다단계 리서치 진행 상황을 실시간 UI에 반영</li>
+    <li>수집 출처·검증 결과·합성 답변을 단계별로 전달</li>
+    <li>클라이언트 <code>streamDeepSearch()</code>와 서버 <code>runDeepSearch()</code> 연결</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>POST /api/deep-search</td><td>SSE 핸들러</td><td><code>src/routes/api/deep-search/+server.ts</code></td></tr><tr><td>streamDeepSearch</td><td>클라이언트 fetch·파싱</td><td><code>src/lib/services/api.ts</code></td></tr><tr><td>runDeepSearch</td><td>서버 파이프라인</td><td><code>src/lib/server/deepSearch/index.ts</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    participant Client as chatStore
+    participant API as /api/deep-search
+    participant DS as runDeepSearch
 
-    <h4>주요 소스 파일</h4>
-    <ul class="source-list">
-      <li>src/routes/api/chat/+server.ts — Chat API</li>
-      <li>src/lib/stores/chat.svelte.ts — 클라이언트 상태</li>
-      <li>src/lib/server/answerDepth.ts — 답변 깊이 휴리스틱</li>
-      <li>src/lib/server/search.ts — 웹 검색</li>
-    </ul>
+    Client->>API: POST query preset seedUrls llmProvider
+    API->>DS: runDeepSearch enqueue signal
+    loop 파이프라인
+        DS-->>API: progress plan searching verify ...
+        API-->>Client: SSE events
+    end
+    DS-->>API: token synthesis_final done
+    API-->>Client: SSE
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>POST /api/deep-search</h3>
+  <p><strong>요청 본문 (JSON)</strong></p>
+  <table><thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead><tbody><tr><td><code>messages</code></td><td><code>{ role, content }[]</code></td><td>대화 이력 (클라이언트: 최근 완료 20개)</td></tr><tr><td><code>query</code></td><td><code>string</code></td><td>사용자 질문</td></tr><tr><td><code>currentDate</code></td><td><code>string</code></td><td>날짜 컨텍스트</td></tr><tr><td><code>localeCalendarDate</code></td><td><code>string</code></td><td><code>YYYY-MM-DD</code></td></tr><tr><td><code>seedUrls</code></td><td><code>string[]</code></td><td>첨부 시드 URL</td></tr><tr><td><code>preset</code></td><td>`'fast' \</td><td>'balanced' \</td><td>'deep'`</td><td>미지정 시 <code>balanced</code></td></tr><tr><td><code>llmProvider</code></td><td>`'local' \</td><td>'omniroute'`</td><td>LLM 제공자</td></tr></tbody></table>
+  <p><strong>응답</strong>: <code>Content-Type: text/event-stream</code></p>
+  <h3>SSE 이벤트 타입</h3>
+  <table><thead><tr><th>type</th><th>주요 필드</th><th>설명</th></tr></thead><tbody><tr><td><code>progress</code></td><td><code>phase</code>, <code>label</code>, <code>detail?</code></td><td>Chat과 동일 5단계 진행</td></tr><tr><td><code>start</code></td><td><code>preset</code>, <code>refineRounds</code>, <code>answerDepth</code></td><td>파이프라인 시작</td></tr><tr><td><code>evidence_warning</code></td><td><code>message</code></td><td>근거 없음 경고</td></tr><tr><td><code>plan</code></td><td><code>subQueries</code>, <code>strategy</code>, <code>subQuestions</code>, <code>stopCriteria</code></td><td>쿼리 계획</td></tr><tr><td><code>searching</code></td><td><code>query</code></td><td>웹 검색 중</td></tr><tr><td><code>sources</code></td><td><code>results</code>, <code>query</code>, <code>isUserProvided?</code></td><td>검색·시드 결과</td></tr><tr><td><code>raw_answer</code></td><td><code>content</code></td><td>수집 출처 마크다운</td></tr><tr><td><code>draft</code></td><td><code>content</code></td><td>초안 미리보기 (500자)</td></tr><tr><td><code>refine_start</code></td><td><code>round</code>, <code>maxRounds</code></td><td>검증 라운드 시작</td></tr><tr><td><code>decompose</code></td><td><code>subQuestions</code>, <code>claims</code></td><td>주장 분해</td></tr><tr><td><code>verify</code></td><td><code>results</code>, <code>confidence</code></td><td>주장 검증 결과</td></tr><tr><td><code>web_search</code></td><td><code>round</code>, <code>queries</code>, <code>pagesFetched</code>, <code>reason</code></td><td>gap-fill 검색</td></tr><tr><td><code>refine</code></td><td><code>thought</code>, <code>revisedDraft</code>, <code>confidence</code></td><td>초안 수정</td></tr><tr><td><code>complete</code></td><td><code>stopReason</code>, <code>confidence</code>, <code>totalPagesFetched</code></td><td>루프 종료</td></tr><tr><td><code>synthesis_start</code></td><td>—</td><td>최종 합성 시작</td></tr><tr><td><code>token</code></td><td><code>content</code></td><td>합성 스트림 청크</td></tr><tr><td><code>synthesis_final</code></td><td><code>content</code></td><td>인용 정리 후 최종 본문</td></tr><tr><td><code>done</code></td><td>—</td><td>스트림 종료</td></tr><tr><td><code>error</code></td><td><code>message</code></td><td>오류</td></tr><tr><td><code>keepalive</code></td><td>—</td><td>20초 간격 (클라이언트 무시)</td></tr></tbody></table>
+  <h3>클라이언트 처리 (`chatStore.sendDeepSearch`)</h3>
+  <ul>
+    <li><code>onStep</code> → <code>deepSearchSteps[]</code> 누적, <code>DeepSearchProgress</code>에 표시</li>
+    <li><code>onSources</code> → <code>searchResults</code> 병합</li>
+    <li><code>onRawAnswer</code> → <code>rawAnswer</code></li>
+    <li><code>onToken</code> / <code>onSynthesisFinal</code> → <code>content</code> (final은 교체)</li>
+    <li><code>onDone</code> → <code>isStreaming = false</code>, IndexedDB persist</li>
+    <li><code>AbortError</code> → <code>onDone()</code> (오류 아님)</li>
+  </ul>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li><code>src/routes/api/deep-search/+server.ts</code></li>
+    <li>src/lib/services/api.ts — `streamDeepSearch`</li>
+    <li>src/lib/stores/chat.svelte.ts — `sendDeepSearch`</li>
+    <li>src/lib/types/index.ts — `DeepSearchStep`, `DeepSearchEvent`, `ClaimVerification`</li>
+    <li><code>src/lib/components/DeepSearchProgress.svelte</code></li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>Chat API(<code>/api/chat</code>)와 별도 경로이며, Deep 활성 시 <code>sendDeepSearch</code>만 호출됩니다.</li>
+    <li><code>start</code> 이벤트의 <code>answerDepth</code>는 서버에서 emit되나 클라이언트 <code>onStep</code>에는 전달되지 않습니다.</li>
+    <li>LLM 연결 실패 시 provider 폴백 없이 <code>error</code> 이벤트가 반환됩니다.</li>
+  </ul>
+</section>
 
-    <h3>참고</h3>
-    <p>대화 데이터 키: IndexedDB <code>jukimbot-chat-conversations</code>. Chat API는 OmniRoute 실패 시 자동 로컬 폴백을 하지 않습니다.</p>
-  </section>
+<section id="deep-research-overview">
+  <h2>8. Deep Research</h2>
+  <h3>개요</h3>
+  <p>Deep Research는 Chat 모드에서 <strong>Deep</strong> 토글로 활성화하는 다단계 웹 리서치 기능입니다. 시드 URL 수집, 쿼리 계획, 웹 검색, 초안 작성, 주장 검증·보완 검색, 최종 합성까지 자동으로 수행합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>단순 웹 검색 채팅보다 깊은 사실 검증·다중 라운드 리서치 제공</li>
+    <li>사용자가 첨부한 시드 URL을 우선 근거로 활용</li>
+    <li>검증 라운드·URL 예산을 프리셋으로 조절해 속도와 깊이 균형</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>ChatInput</td><td>Deep 토글, 프리셋 선택, 시드 URL 입력</td><td><code>src/lib/components/ChatInput.svelte</code></td></tr><tr><td>chatStore</td><td><code>sendDeepSearch()</code>, 시드 URL 상태</td><td><code>src/lib/stores/chat.svelte.ts</code></td></tr><tr><td>DeepSearchProgress</td><td>단계별 타임라인 UI</td><td><code>src/lib/components/DeepSearchProgress.svelte</code></td></tr><tr><td>runDeepSearch</td><td>파이프라인 오케스트레이터</td><td><code>src/lib/server/deepSearch/index.ts</code></td></tr><tr><td>deepSearchBudget</td><td>프리셋별 URL·라운드 예산</td><td><code>src/lib/deepSearchBudget.ts</code></td></tr><tr><td>deep-search API</td><td>SSE 스트림 엔드포인트</td><td><code>src/routes/api/deep-search/+server.ts</code></td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <ol>
+    <li>사용자가 <strong>Deep</strong> 토글을 켜고 (선택) 시드 URL·프리셋을 설정한 뒤 질문을 전송합니다.</li>
+    <li><code>POST /api/deep-search</code>가 SSE로 진행 이벤트를 스트리밍합니다.</li>
+    <li>서버가 시드 URL fetch → 쿼리 계획 → 초기 웹 검색 → 초안 → 검증·보완 루프 → 최종 합성을 수행합니다.</li>
+    <li>클라이언트는 <code>DeepSearchProgress</code>, <code>RawAnswerBlock</code>, 소스 카드, 최종 마크다운 답변을 표시합니다.</li>
+  </ol>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+    A[Deep 토글 + 질문 전송] --> B[sendDeepSearch]
+    B --> C[POST /api/deep-search]
+    C --> D[시드 URL fetch]
+    D --> E[쿼리 계획 LLM]
+    E --> F[초기 웹 검색]
+    F --> G[초안 작성]
+    G --> H[검증·보완 루프]
+    H --> I[최종 합성 스트림]
+    I --> J[IndexedDB 저장]
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>UI 조작</h3>
+  <ul>
+    <li><strong>Deep 토글</strong>: Web 검색과 상호 배타적 (Deep on → Web off).</li>
+    <li><strong>프리셋</strong>: <code>fast</code>(1라운드) / <code>balanced</code>(2, 기본) / <code>deep</code>(4).</li>
+    <li><strong>시드 URL</strong>: 최대 8개 입력 (클라이언트). 서버는 정규화 후 최대 5개 fetch.</li>
+    <li><strong>중단</strong>: 일반 채팅과 동일하게 Stop 버튼 (<code>AbortController</code>).</li>
+  </ul>
+  <h3>프리셋 예산</h3>
+  <table><thead><tr><th>프리셋</th><th>검증 라운드</th><th>초기 subQuery</th><th>gap 검색/라운드</th><th>URL/쿼리</th><th>총 URL 상한</th></tr></thead><tbody><tr><td>fast</td><td>1</td><td>1</td><td>1</td><td>2</td><td>8</td></tr><tr><td>balanced</td><td>2</td><td>2</td><td>2</td><td>3</td><td>15</td></tr><tr><td>deep</td><td>4</td><td>3</td><td>3</td><td>3</td><td>25</td></tr></tbody></table>
+  <h3>답변 깊이</h3>
+  <p>질문 휴리스틱(<code>answerDepth.ts</code>)으로 <code>brief</code> / <code>standard</code> / <code>comprehensive</code>가 결정됩니다. 프리셋과 교차 적용됩니다.</p>
+  <ul>
+    <li><code>fast</code> 프리셋: 최대 <code>standard</code></li>
+    <li><code>deep</code> 프리셋: 최소 <code>standard</code></li>
+    <li><code>brief</code> 깊이: 초안을 그대로 스트리밍 (다단계 합성 생략)</li>
+    <li><code>standard</code>/<code>comprehensive</code>: <code>synthesizeAnswer</code> 하이브리드 합성</li>
+  </ul>
+  <h3>근거 없음 경고</h3>
+  <p>수집된 페이지가 없으면 <code>evidence_warning</code> 이벤트와 함께 한국어 주의 배너가 표시됩니다. 답변은 LLM 추론이며 사실 확인되지 않았음을 안내합니다.</p>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/deepSearch/index.ts — 파이프라인 오케스트레이터</li>
+    <li>src/lib/deepSearchBudget.ts — 프리셋·예산</li>
+    <li>src/lib/server/deepSearch/researchExecutor.ts — 웹 검색·URL fetch</li>
+    <li>src/lib/server/deepSearch/queryPlanner.ts — 쿼리 계획</li>
+    <li>src/lib/server/deepSearch/answerDrafter.ts — 초안</li>
+    <li>src/lib/server/deepSearch/claimVerifier.ts — 주장 검증</li>
+    <li>src/lib/server/deepSearch/gapSearchPlanner.ts — 보완 검색 쿼리</li>
+    <li>src/lib/server/deepSearch/answerRefiner.ts — 초안 수정</li>
+    <li>src/lib/server/deepSearch/answerSynthesizer.ts — 최종 합성</li>
+    <li>src/lib/server/deepSearch/citationSanitizer.ts — 인용·참고 자료 정리</li>
+    <li>src/routes/api/deep-search/+server.ts — API 핸들러</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>LLM 제공자는 Chat 사이드바 선택값(<code>llmStore.provider</code>)을 사용하며, Auto와 달리 로컬 폴백 없음.</li>
+    <li><code>deepSearchPreset</code>, <code>deepSearchEnabled</code>, 시드 URL 큐는 <strong>세션 상태</strong>이며 페이지 새로고침 시 초기화됩니다.</li>
+    <li>완료된 메시지(<code>deepSearchSteps</code>, <code>rawAnswer</code>, <code>searchResults</code> 등)는 IndexedDB <code>jukimbot-chat-conversations</code>에 저장됩니다.</li>
+    <li><code>iterationEvaluator.ts</code>는 테스트용으로 존재하나 현재 파이프라인에 연결되어 있지 않습니다.</li>
+  </ul>
+</section>
+
+<section id="deep-research-pipeline">
+  <h2>9. Deep Research 파이프라인</h2>
+  <h3>개요</h3>
+  <p>Deep Research 서버 파이프라인은 <code>runDeepSearch()</code> → <code>runDeepSearchImpl()</code> (<code>src/lib/server/deepSearch/index.ts</code>)에서 실행됩니다. 각 단계는 SSE 이벤트를 emit하며, URL·라운드 예산은 프리셋(<code>deepSearchBudget.ts</code>)으로 제한됩니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>리서치 단계를 모듈별로 분리해 계획·수집·검증·합성을 체계화</li>
+    <li>근거 부족 시 gap-fill 검색으로 주장을 재검증</li>
+    <li>수집 URL만 인용 허용(<code>citationSanitizer</code>)으로 환각 링크 방지</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>단계</th><th>모듈</th><th>역할</th></tr></thead><tbody><tr><td>시드 수집</td><td><code>researchExecutor.ts</code></td><td>사용자 URL 병렬 fetch</td></tr><tr><td>쿼리 계획</td><td><code>queryPlanner.ts</code></td><td>subQuery·전략·subQuestion LLM 계획</td></tr><tr><td>웹 검색</td><td><code>researchExecutor.ts</code></td><td>searchWeb + 페이지 fetch, URL 중복 제거</td></tr><tr><td>초안</td><td><code>answerDrafter.ts</code></td><td>근거 기반 또는 학습 지식 초안</td></tr><tr><td>분해</td><td><code>answerDecomposer.ts</code></td><td>subQuestion + atomic claim 추출</td></tr><tr><td>검증</td><td><code>claimVerifier.ts</code></td><td>supported/unsupported/contradicted/unverifiable</td></tr><tr><td>gap 검색</td><td><code>gapSearchPlanner.ts</code></td><td>규칙 기반 보완 쿼리 (LLM 없음)</td></tr><tr><td>수정</td><td><code>answerRefiner.ts</code></td><td>검증 결과 반영 초안 개선</td></tr><tr><td>합성</td><td><code>answerSynthesizer.ts</code></td><td>최종 보고서 스트리밍</td></tr><tr><td>청크 분석</td><td><code>chunkPipeline.ts</code></td><td>hybrid 합성 시 청크별 분석</td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <h3>1. 초기화</h3>
+  <ul>
+    <li>프리셋 예산 resolve (<code>resolveDeepSearchPreset</code>, 기본 <code>balanced</code>)</li>
+    <li><code>answerDepth</code> 결정 (<code>resolveAnswerDepth</code> + 프리셋 floor/ceiling)</li>
+    <li>대화 컨텍스트: 메시지 2개 초과 시 최근 4개, 각 200자</li>
+    <li><code>progress: prepare</code>, <code>start</code> 이벤트 emit</li>
+  </ul>
+  <h3>2. Phase 0 — 시드 URL</h3>
+  <ul>
+    <li><code>executeSeedUrlResearch()</code>: 정규화 URL 최대 5개, 본문 80자 이상만 유지</li>
+    <li><code>sources</code> 이벤트 (<code>isUserProvided: true</code>)</li>
+    <li>리서치 컨텍스트에 <strong>PRIORITY</strong> 표시</li>
+  </ul>
+  <h3>3. Phase 0.5 — 쿼리 계획</h3>
+  <ul>
+    <li><code>planQuery()</code>: LLM JSON — 2~4 <code>subQueries</code>, <code>strategy</code>, 3~6 <code>subQuestions</code>, 3~5 <code>stopCriteria</code></li>
+    <li>시드 본문 미리보기(3000자) 첨부</li>
+    <li>실패 시 사용자 질문 단일 쿼리로 폴백</li>
+    <li><code>plan</code> 이벤트 emit</li>
+    <li><code>stopCriteria</code>·<code>subQuestions</code>는 emit만 하고 루프 조건에는 미사용</li>
+  </ul>
+  <h3>4. Phase 0.6 — 초기 웹 검색</h3>
+  <ul>
+    <li>계획의 첫 <code>initialSubQueries</code>개 subQuery 실행</li>
+    <li>쿼리마다: <code>searchWeb</code> → <code>seenUrls</code> dedupe → <code>fetchUrlContent</code> (100자 초과만)</li>
+    <li>달력 날짜를 쿼리에 포함 (<code>resolveSearchCalendarDate</code>)</li>
+    <li><code>maxTotalUrls</code>, <code>urlsPerQuery</code>, <code>depthConfig.maxPageChars</code> 준수</li>
+    <li><code>searching</code>, <code>sources</code> 이벤트</li>
+  </ul>
+  <h3>5. 근거 확인·원문</h3>
+  <ul>
+    <li>페이지 없으면 <code>evidence_warning</code></li>
+    <li><code>buildCollectedTextsMarkdown()</code> → <code>raw_answer</code> 이벤트</li>
+  </ul>
+  <h3>6. Phase 1 — 초안</h3>
+  <ul>
+    <li><code>draftAnswer()</code>: 근거 있으면 출처 기반, 없으면 학습 지식 전용 프롬프트</li>
+    <li><code>draft</code> 이벤트 (500자 미리보기)</li>
+  </ul>
+  <h3>7. Phase 2~N — 검증·보완 루프 (`refineRounds`회)</h3>
+  <p>각 라운드:</p>
+  <ol>
+    <li><code>decomposeAnswer()</code> → subQuestion + claim (검증 배치 최대 12개)</li>
+    <li><code>verifyClaims()</code> → 상태 분류</li>
+    <li><code>applyEvidenceContextCheck()</code> — supported는 출처 본문에 substring 존재 필요</li>
+    <li><strong>gap-fill</strong> (unsupported/contradicted + URL 예산 잔여):</li>
+  </ol>
+  <p>- <code>buildGapSearchQueries()</code> — 최대 2 claim → <code>maxGapSearches</code> 쿼리    - <code>runWebSearchRound()</code> → 재검증    - <code>web_search</code> (<code>reason: 'gap_fill'</code>), <code>raw_answer</code> 갱신</p>
+  <ol>
+    <li><code>computeClaimConfidence()</code> — supported 비율, contradicted 시 절반, 근거 없으면 0.5 상한</li>
+    <li><code>refineAnswer()</code> → <code>{ thought, revisedDraft }</code></li>
+    <li><strong>조기 종료</strong>: 모든 claim <code>supported</code> + <code>hasEvidence</code></li>
+    <li><code>refine_start</code>, <code>decompose</code>, <code>verify</code>, <code>refine</code> 이벤트</li>
+  </ol>
+  <h3>8. 합성</h3>
+  <ul>
+    <li><code>complete</code> (stopReason, confidence, totalPagesFetched)</li>
+    <li><code>progress: write</code>, <code>synthesis_start</code></li>
+  </ul>
+  <p><strong>brief 깊이:</strong></p>
+  <ul>
+    <li>경고 배너 + <code>currentDraft</code> → <code>finalizeDeepSearchSynthesis()</code> → 24자 청크 <code>token</code> 스트림 → <code>done</code></li>
+  </ul>
+  <p><strong>standard/comprehensive:</strong></p>
+  <ul>
+    <li><code>synthesizeAnswer()</code> (<code>synthesisMode: 'hybrid'</code>)</li>
+    <li>멀티섹션: outline JSON → 섹션별 스트리밍 (<code>streamKind: 'section'</code>)</li>
+    <li>outline 실패 시 single-pass 폴백</li>
+    <li><code>chunkPipeline</code> 선택적 사용</li>
+    <li><code>finalizeDeepSearchSynthesis()</code> — <code>## 참고 자료</code> append</li>
+    <li><code>token</code> 스트림, <code>synthesis_final</code>, <code>done</code></li>
+  </ul>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+    INIT[프리셋 + answerDepth] --> SEED{시드 URL?}
+    SEED -->|yes| FETCH[executeSeedUrlResearch]
+    SEED -->|no| PLAN
+    FETCH --> PLAN[planQuery]
+    PLAN --> SEARCH[초기 웹 검색]
+    SEARCH --> EVID{근거 있음?}
+    EVID -->|no| WARN[evidence_warning]
+    EVID -->|yes| RAW
+    WARN --> RAW[raw_answer]
+    RAW --> DRAFT[draftAnswer]
+    DRAFT --> LOOP[검증 라운드 1..N]
+    LOOP --> DEC[decomposeAnswer]
+    DEC --> VER[verifyClaims]
+    VER --> GAP{미지원/모순?}
+    GAP -->|yes| GSEARCH[gap-fill 검색]
+    GSEARCH --> VER
+    GAP -->|no| CONF[computeClaimConfidence]
+    CONF --> REF[refineAnswer]
+    REF --> EARLY{전부 supported?}
+    EARLY -->|yes| SYNTH
+    EARLY -->|no, 라운드 잔여| LOOP
+    EARLY -->|no| SYNTH[합성]
+    SYNTH --> BRIEF{brief?}
+    BRIEF -->|yes| STREAM1[초안 스트림]
+    BRIEF -->|no| SYNTH2[synthesizeAnswer hybrid]
+    STREAM1 --> DONE[done]
+    SYNTH2 --> DONE
+  </pre></div>
+  <h3>사용 방법</h3>
+  <p>개발자가 파이프라인을 확장할 때 참고할 제약:</p>
+  <table><thead><tr><th>제약</th><th>값</th></tr></thead><tbody><tr><td>클라이언트 시드 URL 상한</td><td>8</td></tr><tr><td>서버 시드 fetch 상한</td><td>5 (<code>MAX_SEED_URLS</code>)</td></tr><tr><td>claim 검증 배치</td><td>최대 12</td></tr><tr><td>gap 쿼리 입력 claim</td><td>최대 2</td></tr><tr><td>keepalive 간격</td><td>20초</td></tr><tr><td>토큰 청크 (brief 스트림)</td><td>24자</td></tr></tbody></table>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/deepSearch/index.ts — 오케스트레이터</li>
+    <li><code>src/lib/server/deepSearch/researchExecutor.ts</code></li>
+    <li><code>src/lib/server/deepSearch/queryPlanner.ts</code></li>
+    <li><code>src/lib/server/deepSearch/answerDrafter.ts</code></li>
+    <li><code>src/lib/server/deepSearch/answerDecomposer.ts</code></li>
+    <li><code>src/lib/server/deepSearch/claimVerifier.ts</code></li>
+    <li><code>src/lib/server/deepSearch/gapSearchPlanner.ts</code></li>
+    <li><code>src/lib/server/deepSearch/answerRefiner.ts</code></li>
+    <li><code>src/lib/server/deepSearch/answerSynthesizer.ts</code></li>
+    <li><code>src/lib/server/deepSearch/chunkPipeline.ts</code></li>
+    <li><code>src/lib/server/deepSearch/citationSanitizer.ts</code></li>
+    <li><code>src/lib/server/answerDepth.ts</code></li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>서버는 20초마다 <code>{ type: 'keepalive' }</code>를 emit합니다.</li>
+    <li>스트림 <code>cancel()</code> 시 <code>AbortController</code>로 파이프라인 중단.</li>
+    <li>합성 모드 <code>hybrid</code>는 서버 고정이며 UI에서 선택 불가 (<code>DeepSearchSynthesisModeId</code>는 레거시).</li>
+  </ul>
+</section>
+
+<section id="llm-health-and-fallback">
+  <h2>10. LLM 헬스체크·폴백</h2>
+  <h3>개요</h3>
+  <p>LLM 제공자 연결 상태는 <code>GET /api/llm/health</code>로 확인합니다. 기능별로 제공자 실패 시 폴백 동작이 다릅니다 — Auto만 OpenRouter → Local 자동 전환을 지원합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>UI에서 선택한 제공자의 가용성을 실시간 표시</li>
+    <li>Auto 실행 시 클라우드 API 장애·쿼터 소진에 대한 복원력 제공</li>
+    <li>Chat·Deep Research는 선택 제공자 고정으로 예측 가능한 동작 유지</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>GET /api/llm/health</td><td>헬스 API</td><td><code>src/routes/api/llm/health/+server.ts</code></td></tr><tr><td>checkLlmHealth</td><td>제공자별 ping</td><td><code>src/lib/server/llm/index.ts</code></td></tr><tr><td>llmStore.refreshHealth</td><td>클라이언트 폴링</td><td><code>src/lib/stores/llm.svelte.ts</code></td></tr><tr><td>callLlmNonStreamingWithLocalFallback</td><td>Auto 폴백</td><td><code>src/lib/server/llm/index.ts</code></td></tr><tr><td>Sidebar</td><td>연결 상태 점·라벨</td><td><code>src/lib/components/Sidebar.svelte</code></td></tr></tbody></table>
+  <h3>헬스체크 API</h3>
+  <h3>GET /api/llm/health</h3>
+  <p><strong>쿼리</strong>: <code>provider=local|omniroute</code> (미지정·알 수 없는 값 → <code>local</code>)</p>
+  <p><strong>동작</strong>:</p>
+  <table><thead><tr><th>provider</th><th>확인 방법</th><th>타임아웃</th></tr></thead><tbody><tr><td><code>local</code></td><td><code>GET {OLLAMA_URL}/api/tags</code></td><td>5초</td></tr><tr><td><code>omniroute</code></td><td><code>GET {OMNIROUTE_BASE_URL}/models</code> (Bearer)</td><td>5초</td></tr></tbody></table>
+  <p><strong>응답 (JSON)</strong>:</p>
+  <pre><code>{
+  "ok": true,
+  "provider": "local",
+  "model": "llama3.1:8b"
+}</code></pre>
+  <ul>
+    <li><code>ok</code>: 연결 성공 여부</li>
+    <li><code>model</code>: <code>getLlmModelLabel(provider)</code> 표시용 라벨</li>
+  </ul>
+  <h3>클라이언트 UI</h3>
+  <ul>
+    <li><code>Sidebar</code> 마운트 시 + 제공자 변경 시 <code>llmStore.refreshHealth()</code> 호출</li>
+    <li>상태 점: 녹색(Connected) / 빨간색(Unavailable) / 회색(checking…)</li>
+    <li><code>ChatInput</code> 푸터: <code>Powered by {label} · {model}</code></li>
+  </ul>
+  <h3>기능별 폴백 동작</h3>
+  <table><thead><tr><th>기능</th><th>제공자 소스</th><th>Local 폴백</th><th>실패 시</th></tr></thead><tbody><tr><td><strong>Chat</strong></td><td><code>llmStore.provider</code></td><td><strong>없음</strong></td><td>SSE <code>{ type: 'error', message }</code></td></tr><tr><td><strong>Deep Research</strong></td><td><code>llmStore.provider</code></td><td><strong>없음</strong></td><td>SSE <code>error</code> 이벤트</td></tr><tr><td><strong>Auto</strong></td><td>번들 <code>llmProvider</code> / <code>LLM_DEFAULT_PROVIDER</code></td><td><strong>있음</strong></td><td>Local 재시도 + 안내 문구 prepend</td></tr></tbody></table>
+  <h3>Auto 폴백 (`callLlmNonStreamingWithLocalFallback`)</h3>
+  <p><strong>조건</strong>: primary가 <code>omniroute</code>이고 다음 중 하나:</p>
+  <ul>
+    <li>빈 응답</li>
+    <li><code>isLlmFallbackEligibleError</code>에 해당하는 오류</li>
+  </ul>
+  <p><strong>폴백 대상 오류</strong>:</p>
+  <ul>
+    <li>타임아웃 (<code>ECONNABORTED</code>, timed out)</li>
+    <li>네트워크: <code>ECONNREFUSED</code>, <code>ENOTFOUND</code>, <code>ETIMEDOUT</code>, <code>ERR_NETWORK</code></li>
+    <li>HTTP: 401, 402, 403, 429, 500, 502, 503</li>
+    <li>메시지 패턴: quota, credit, token, rate-limit, billing, unauthorized 등</li>
+  </ul>
+  <p><strong>성공 시</strong>: 응답 앞에 <code>buildLlmFallbackNotice('omniroute')</code> 추가</p>
+  <pre><code>[OpenRouter 실패 → Local 모델로 응답]
+
+{본문}</code></pre>
+  <p><code>BundleEditor</code>는 <code>omniroute</code> 선택 시 "OpenRouter 연결 실패 또는 토큰 소진 시 Local 모델로 자동 전환" 안내를 표시합니다.</p>
+  <h3>연결 오류 메시지 (`getLlmConnectionErrorMessage`)</h3>
+  <table><thead><tr><th>provider</th><th>메시지 (요약)</th></tr></thead><tbody><tr><td><code>omniroute</code></td><td>API 키·네트워크 확인</td></tr><tr><td><code>local</code></td><td><code>ollama serve</code> 실행, <code>llama3.1:8b</code> pull 확인</td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+    subgraph Health
+        UI[Sidebar mount / provider change] --> H[GET /api/llm/health]
+        H --> OK{ok?}
+        OK -->|yes| GREEN[Connected]
+        OK -->|no| RED[Unavailable]
+    end
+
+    subgraph AutoExecute
+        A[executeBundle omniroute] --> B[callLlmNonStreamingWithLocalFallback]
+        B --> C{성공?}
+        C -->|yes| D[결과 반환]
+        C -->|no, eligible| E[callLlmNonStreaming local]
+        E --> F[prepend fallback notice]
+        F --> D
+        C -->|no, not eligible| G[오류 반환]
+    end
+
+    subgraph ChatDeep
+        CH[streamChat / deep-search] --> P[선택 provider 고정]
+        P --> Q{실패?}
+        Q -->|yes| ERR[SSE error]
+    end
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>헬스체크 호출 예</h3>
+  <pre><code>curl "http://localhost:5173/api/llm/health?provider=local"
+curl "http://localhost:5173/api/llm/health?provider=omniroute"</code></pre>
+  <h3>운영 체크리스트</h3>
+  <ul>
+    <li><strong>Local</strong>: <code>ollama serve</code> 실행, <code>OLLAMA_MODEL</code> pull 완료</li>
+    <li><strong>OpenRouter</strong>: <code>OMNIROUTE_API_KEY</code> 설정, <code>OMNIROUTE_BASE_URL</code> 확인</li>
+    <li><strong>Auto 스케줄 기본 제공자</strong>: <code>LLM_DEFAULT_PROVIDER</code> env</li>
+  </ul>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li><code>src/routes/api/llm/health/+server.ts</code></li>
+    <li>src/lib/server/llm/index.ts — `checkLlmHealth`, `callLlmNonStreamingWithLocalFallback`</li>
+    <li>src/lib/server/llm/types.ts — `getLlmConnectionErrorMessage`, `buildLlmFallbackNotice`</li>
+    <li><code>src/lib/stores/llm.svelte.ts</code></li>
+    <li><code>src/lib/components/Sidebar.svelte</code></li>
+    <li>src/lib/server/scheduler.ts — Auto에서 폴백 함수 호출</li>
+    <li>src/routes/api/chat/+server.ts — 폴백 없음</li>
+    <li>src/routes/api/deep-search/+server.ts — 폴백 없음</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>Chat 스트리밍(<code>createLlmStream</code>)에는 타임아웃 재시도가 없고, 비스트리밍만 1회 재시도합니다.</li>
+    <li>Deep Research 내부 합성 실패 시 outline → single-pass 등 <strong>파이프라인 내부</strong> 폴백은 있으나, 제공자 전환 폴백은 없습니다.</li>
+  </ul>
+</section>
+
+<section id="llm-providers">
+  <h2>11. LLM 제공자</h2>
+  <h3>개요</h3>
+  <p>JukimBot은 두 가지 LLM 제공자를 지원합니다: <strong>local</strong>(Ollama)과 <strong>omniroute</strong>(OpenAI 호환 API, UI에서는 OpenRouter). <code>$lib/server/llm/</code> 모듈이 HTTP 호출·스트림 파싱·헬스체크를 통합합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>로컬 Ollama와 클라우드 OpenRouter를 동일 인터페이스로 사용</li>
+    <li>스트리밍·비스트리밍·합성(stream kind)별 토큰 한도 분리</li>
+    <li>Chat·Auto·Deep Research에서 제공자를 일관되게 라우팅</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td>llm/index.ts</td><td>Facade: createLlmStream, callLlmNonStreaming, 폴백</td><td><code>src/lib/server/llm/index.ts</code></td></tr><tr><td>ollamaProvider.ts</td><td>Ollama HTTP (<code>/api/chat</code>)</td><td><code>src/lib/server/llm/ollamaProvider.ts</code></td></tr><tr><td>omnirouteProvider.ts</td><td>OpenAI 호환 HTTP (<code>/chat/completions</code>)</td><td><code>src/lib/server/llm/omnirouteProvider.ts</code></td></tr><tr><td>streamParsers.ts</td><td>NDJSON(Ollama) / SSE(OpenAI) → token 이벤트</td><td><code>src/lib/server/llm/streamParsers.ts</code></td></tr><tr><td>types.ts</td><td>LlmProvider, env resolve, 라벨</td><td><code>src/lib/server/llm/types.ts</code></td></tr><tr><td>llmStore</td><td>클라이언트 제공자 선택·저장</td><td><code>src/lib/stores/llm.svelte.ts</code></td></tr><tr><td>ollama.ts</td><td>llm/ 재export shim (deprecated)</td><td><code>src/lib/server/ollama.ts</code></td></tr></tbody></table>
+  <h3>제공자 비교</h3>
+  <table><thead><tr><th>항목</th><th>local</th><th>omniroute</th></tr></thead><tbody><tr><td>UI 라벨</td><td>Local</td><td>OpenRouter</td></tr><tr><td>기본 URL</td><td><code>http://localhost:11434</code></td><td><code>http://localhost:20128/v1</code> (env 미설정 시)</td></tr><tr><td>스트림 API</td><td><code>POST /api/chat</code></td><td><code>POST /chat/completions</code></td></tr><tr><td>기본 모델 (런타임)</td><td><code>llama3.1:8b</code></td><td><code>auto</code></td></tr><tr><td>표시 모델 라벨</td><td><code>OLLAMA_MODEL</code> 또는 <code>llama3.1:8b</code></td><td><code>OMNIROUTE_MODEL</code> 또는 <code>openrouter/free</code></td></tr><tr><td>인증</td><td>없음</td><td><code>Bearer</code> (<code>OMNIROUTE_API_KEY</code> 또는 <code>LLM_API_KEY</code>)</td></tr><tr><td>추가 헤더</td><td>—</td><td><code>HTTP-Referer</code>, <code>X-Title: JukimBot</code></td></tr><tr><td>헬스체크</td><td><code>GET /api/tags</code></td><td><code>GET /models</code></td></tr></tbody></table>
+  <p>&gt; <code>.env.example</code>의 <code>OMNIROUTE_BASE_URL</code>은 <code>https://openrouter.ai/api/v1</code>입니다. env를 설정하면 해당 URL이 사용됩니다.</p>
+  <h3>환경 변수</h3>
+  <table><thead><tr><th>변수</th><th>설명</th><th>기본값 (코드)</th></tr></thead><tbody><tr><td><code>OLLAMA_URL</code></td><td>Ollama API 주소</td><td><code>http://localhost:11434</code></td></tr><tr><td><code>OLLAMA_MODEL</code></td><td>로컬 모델</td><td><code>llama3.1:8b</code></td></tr><tr><td><code>OLLAMA_NUM_PREDICT_STREAM</code></td><td>chat 스트림 max tokens</td><td><code>4096</code></td></tr><tr><td><code>OLLAMA_NUM_PREDICT_SYNTH</code></td><td>synthesis/section max tokens</td><td><code>8192</code></td></tr><tr><td><code>OLLAMA_NUM_PREDICT_NONSTREAM</code></td><td>비스트리밍 max tokens</td><td><code>4096</code> (env), 코드 fallback <code>2048</code></td></tr><tr><td><code>OLLAMA_STREAM_TIMEOUT_MS</code></td><td>스트림 타임아웃</td><td><code>1_800_000</code> ms</td></tr><tr><td><code>OLLAMA_NON_STREAM_TIMEOUT_MS</code></td><td>비스트리밍 타임아웃</td><td><code>1_800_000</code> ms</td></tr><tr><td><code>OMNIROUTE_BASE_URL</code></td><td>OpenRouter API</td><td><code>http://localhost:20128/v1</code></td></tr><tr><td><code>OMNIROUTE_MODEL</code></td><td>모델 ID</td><td><code>auto</code></td></tr><tr><td><code>OMNIROUTE_API_KEY</code></td><td>API 키</td><td>—</td></tr><tr><td><code>LLM_API_KEY</code></td><td>대체 API 키</td><td><code>OMNIROUTE_API_KEY</code> 없을 때</td></tr><tr><td><code>LLM_DEFAULT_PROVIDER</code></td><td>서버 기본 제공자 (Auto)</td><td><code>local</code> (env <code>omniroute</code>면 omniroute)</td></tr></tbody></table>
+  <h3>스트림 종류 (LlmStreamKind)</h3>
+  <table><thead><tr><th>kind</th><th>용도</th><th>기본 num_predict / max_tokens</th></tr></thead><tbody><tr><td><code>chat</code></td><td>일반 채팅 스트림</td><td><code>OLLAMA_NUM_PREDICT_STREAM</code> (4096)</td></tr><tr><td><code>synthesis</code></td><td>Deep Research 합성</td><td><code>OLLAMA_NUM_PREDICT_SYNTH</code> (8192)</td></tr><tr><td><code>section</code></td><td>멀티섹션 합성</td><td><code>OLLAMA_NUM_PREDICT_SYNTH</code> (8192)</td></tr></tbody></table>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+    A[createLlmStream / callLlmNonStreaming] --> B{provider}
+    B -->|local| C[ollamaProvider]
+    B -->|omniroute| D[omnirouteProvider]
+    C --> E[POST /api/chat]
+    D --> F[POST /chat/completions]
+    E --> G[pipeLlmChatStream]
+    F --> G
+    G --> H[token SSE events]
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>Chat (클라이언트)</h3>
+  <ul>
+    <li>사이드바 <strong>Model</strong> 라디오: Local / OpenRouter</li>
+    <li><code>llmStore.setProvider()</code> → <code>localStorage</code> <code>jukimbot-llm-provider</code></li>
+    <li><code>streamChat</code> / <code>streamDeepSearch</code> 요청 body에 <code>llmProvider</code> 포함</li>
+  </ul>
+  <h3>Auto (번들별)</h3>
+  <ul>
+    <li><code>BundleEditor</code>에서 번들마다 제공자 선택</li>
+    <li><code>llmProvider</code> 필드가 IndexedDB <code>jukimbot-auto-bundles</code>에 저장</li>
+    <li>스케줄·Run Now 시 서버로 전달</li>
+    <li>미지정 시 <code>resolveDefaultLlmProvider()</code> (<code>LLM_DEFAULT_PROVIDER</code> env)</li>
+  </ul>
+  <h3>API Facade 함수</h3>
+  <table><thead><tr><th>함수</th><th>모드</th><th>설명</th></tr></thead><tbody><tr><td><code>createLlmStream</code></td><td>스트리밍</td><td>Chat·Deep 합성</td></tr><tr><td><code>callLlmNonStreaming</code></td><td>비스트리밍</td><td>Deep 파이프라인 중간 단계</td></tr><tr><td><code>callLlmNonStreamingWithLocalFallback</code></td><td>비스트리밍 + 폴백</td><td>Auto 전용</td></tr><tr><td><code>pipeLlmChatStream</code></td><td>파서</td><td>upstream → <code>{ type: 'token' }</code></td></tr><tr><td><code>checkLlmHealth</code></td><td>헬스</td><td><code>/api/llm/health</code>에서 사용</td></tr></tbody></table>
+  <p>비스트리밍은 타임아웃 시 1회 재시도 (<code>isLlmTimeoutError</code>).</p>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li><code>src/lib/server/llm/index.ts</code></li>
+    <li><code>src/lib/server/llm/ollamaProvider.ts</code></li>
+    <li><code>src/lib/server/llm/omnirouteProvider.ts</code></li>
+    <li><code>src/lib/server/llm/streamParsers.ts</code></li>
+    <li><code>src/lib/server/llm/types.ts</code></li>
+    <li><code>src/lib/stores/llm.svelte.ts</code></li>
+    <li><code>src/lib/components/Sidebar.svelte</code></li>
+    <li><code>src/lib/components/auto/BundleEditor.svelte</code></li>
+    <li><code>.env.example</code></li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li><code>getLlmModelLabel('omniroute')</code>는 UI용 <code>openrouter/free</code>를 반환할 수 있으나, <code>omnirouteModel()</code> 런타임 기본값은 <code>auto</code>입니다.</li>
+    <li>클라이언트 <code>llmStore</code> 기본값은 <code>local</code>이며 <code>LLM_DEFAULT_PROVIDER</code> env를 읽지 않습니다.</li>
+    <li><code>ollama.ts</code>는 deprecated shim이며 신규 코드는 <code>$lib/server/llm</code>을 직접 import합니다.</li>
+  </ul>
+</section>
+
+<section id="messenger-kakao-oauth">
+  <h2>12. 카카오 OAuth·메시지 전송</h2>
+  <h3>개요</h3>
+  <p>Auto 모드는 카카오 로그인(OAuth 2.0)으로 사용자 토큰을 발급받고, 카카오톡 나에게 보내기 API(<code>talk/memo/default/send</code>)로 분석 결과를 전송합니다. 토큰은 서버 파일 <code>.kakao-tokens.json</code>에 저장됩니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>사용자 본인 카카오톡으로 Auto 분석 결과 자동 알림</li>
+    <li>OAuth로 <code>talk_message</code> 스코프 획득 후 서버에서 메모 전송</li>
+    <li>긴 결과 텍스트를 청크 단위로 분할 전송</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td><code>getAuthUrl</code></td><td>OAuth 인가 URL 생성</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td><code>exchangeCode</code></td><td>인가 코드 → 토큰 교환</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td><code>refreshAccessToken</code></td><td>만료 시 토큰 갱신</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td><code>sendMessageChunked</code></td><td>청크 분할·전송</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td><code>GET /api/auto/kakao/connect</code></td><td>OAuth 시작 (302 리다이렉트)</td><td><code>src/routes/api/auto/kakao/connect/+server.ts</code></td></tr><tr><td><code>GET /api/auto/kakao/callback</code></td><td>OAuth 콜백 처리</td><td><code>src/routes/api/auto/kakao/callback/+server.ts</code></td></tr><tr><td><code>GET /api/auto/kakao/status</code></td><td>연동 상태</td><td><code>src/routes/api/auto/kakao/status/+server.ts</code></td></tr><tr><td><code>POST /api/auto/kakao/test</code></td><td>테스트 메모 전송</td><td><code>src/routes/api/auto/kakao/test/+server.ts</code></td></tr><tr><td><code>autoStore.checkKakaoStatus</code></td><td>UI 상태 폴링</td><td><code>src/lib/stores/auto.svelte.ts</code></td></tr><tr><td><code>scheduler.executeBundle</code></td><td>실행 후 카카오 자동 전송</td><td><code>src/lib/server/scheduler.ts</code></td></tr></tbody></table>
+  <h3>OAuth 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    participant User
+    participant UI as Auto UI
+    participant Connect as /api/auto/kakao/connect
+    participant KakaoAuth as kauth.kakao.com
+    participant Callback as /api/auto/kakao/callback
+    participant Server as kakao.ts
+    participant File as .kakao-tokens.json
+
+    User->>UI: Connect Kakao Talk
+    UI->>Connect: GET
+    Connect->>KakaoAuth: 302 authorize (scope=talk_message)
+    KakaoAuth->>User: 로그인·동의
+    KakaoAuth->>Callback: redirect ?code=
+    Callback->>Server: exchangeCode(code, origin)
+    Server->>KakaoAuth: POST /oauth/token (authorization_code)
+    KakaoAuth-->>Server: access_token, refresh_token
+    Server->>File: saveTokens()
+    Callback->>UI: redirect /?mode=auto&kakao=connected
+  </pre></div>
+  <h3>OAuth URL 파라미터</h3>
+  <table><thead><tr><th>파라미터</th><th>값</th></tr></thead><tbody><tr><td><code>client_id</code></td><td><code>KAKAO_REST_API_KEY</code> (환경 변수)</td></tr><tr><td><code>redirect_uri</code></td><td><code>{origin}/api/auto/kakao/callback</code></td></tr><tr><td><code>response_type</code></td><td><code>code</code></td></tr><tr><td><code>scope</code></td><td><code>talk_message</code></td></tr></tbody></table>
+  <h3>콜백 처리</h3>
+  <ul>
+    <li>성공: <code>/?mode=auto&amp;kakao=connected</code></li>
+    <li>실패: <code>/?mode=auto&amp;kakao=error&amp;msg={encodeURIComponent(error)}</code></li>
+    <li>OAuth <code>error</code> 쿼리 또는 <code>code</code> 누락 시 에러 리다이렉트</li>
+  </ul>
+  <h3>토큰 관리</h3>
+  <table><thead><tr><th>함수</th><th>동작</th></tr></thead><tbody><tr><td><code>isConfigured()</code></td><td><code>KAKAO_REST_API_KEY</code> 존재</td></tr><tr><td><code>isConnected()</code></td><td>토큰 파일 존재 + (미만료 또는 refresh_token 보유)</td></tr><tr><td><code>ensureValidToken()</code></td><td>만료 시 <code>refreshAccessToken()</code> 후 access_token 반환</td></tr><tr><td><code>refreshAccessToken()</code></td><td>실패 시 <code>clearTokens()</code> 및 <code>null</code></td></tr></tbody></table>
+  <p>Refresh grant: <code>grant_type=refresh_token</code>, 동일 <code>client_id</code>·<code>refresh_token</code>.</p>
+  <h3>메시지 전송</h3>
+  <h3>API</h3>
+  <ul>
+    <li><strong>엔드포인트</strong>: <code>POST https://kapi.kakao.com/v2/api/talk/memo/default/send</code></li>
+    <li><strong>인증</strong>: <code>Authorization: Bearer {access_token}</code></li>
+    <li><strong>본문</strong>: <code>template_object</code> (URL-encoded JSON)</li>
+  </ul>
+  <p>템플릿 <code>object_type: "text"</code>, 고정 링크(<code>developers.kakao.com</code>), <code>button_title: "Open"</code>.</p>
+  <h3>청크 전송</h3>
+  <table><thead><tr><th>상수</th><th>값</th><th>설명</th></tr></thead><tbody><tr><td><code>CHUNK_SIZE</code></td><td>1000</td><td>청크 최대 글자 수</td></tr><tr><td><code>SEND_DELAY_MS</code></td><td>500</td><td>청크 간 대기</td></tr></tbody></table>
+  <p>분할 우선순위: <code>\n\n</code> → <code>\n</code> → <code>. </code> → 공백 → 강제 절단.</p>
+  <p>다중 청크 시 제목에 <code>(1/N)</code> 형식 접두사 추가. 401 응답 시 토큰 refresh 후 해당 청크 재시도.</p>
+  <h3>Auto 실행 연동</h3>
+  <p><code>scheduler.ts</code>의 <code>executeBundle()</code>:</p>
+  <ul>
+    <li>LLM 결과 생성 후 <code>isKakaoConnected()</code>이면 <strong>항상</strong> 카카오 전송 시도 (번들별 on/off 플래그 없음)</li>
+    <li>미연동 시 경고 로그만 출력하고 실행은 <code>success: true</code>로 계속</li>
+    <li>응답에 <code>kakaoSent</code>, <code>kakaoError</code> 포함</li>
+  </ul>
+  <h3>API 엔드포인트</h3>
+  <table><thead><tr><th>경로</th><th>메서드</th><th>설명</th></tr></thead><tbody><tr><td><code>/api/auto/kakao/connect</code></td><td>GET</td><td>OAuth 인가 페이지로 리다이렉트. 미설정 시 500</td></tr><tr><td><code>/api/auto/kakao/callback</code></td><td>GET</td><td>코드 교환 후 UI 리다이렉트</td></tr><tr><td><code>/api/auto/kakao/status</code></td><td>GET</td><td><code>getConnectionInfo()</code> JSON</td></tr><tr><td><code>/api/auto/kakao/test</code></td><td>POST</td><td>테스트 메모 전송 (연동·설정 검증)</td></tr></tbody></table>
+  <h3>테스트 메시지</h3>
+  <p><code>POST /api/auto/kakao/test</code>는 한국 시간 포함 고정 문구를 <code>sendMessage('Test', ...)</code>로 전송합니다. <code>configured</code>·<code>connected</code> 미충족 시 400과 <code>connectionInfo</code> 반환.</p>
+  <h3>사용 방법</h3>
+  <h3>환경 설정 (`.env.example` 기준)</h3>
+  <ol>
+    <li>[카카오 개발자](https://developers.kakao.com) 앱 생성</li>
+    <li>"카카오톡 메시지" 활성화</li>
+    <li>Redirect URI: <code>http://localhost:5173/api/auto/kakao/callback</code> (배포 origin에 맞게 추가)</li>
+    <li>REST API 키를 <code>KAKAO_REST_API_KEY</code>에 설정</li>
+  </ol>
+  <h3>UI 연동</h3>
+  <ul>
+    <li><code>autoStore.checkKakaoStatus()</code> — 페이지 로드 시 연결 상태</li>
+    <li>Connect 버튼 — <code>/api/auto/kakao/connect</code>로 이동</li>
+    <li><code>+page.svelte</code> — <code>kakao=connected</code> / <code>kakao=error</code> 쿼리 처리</li>
+  </ul>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/kakao.ts — OAuth·토큰·전송 핵심</li>
+    <li>src/routes/api/auto/kakao/ — connect, callback, status, test</li>
+    <li>src/lib/server/scheduler.ts — 실행 파이프라인 내 카카오 호출</li>
+    <li>src/lib/stores/auto.svelte.ts — UI 상태·테스트</li>
+    <li>.env.example — 설정 가이드</li>
+    <li>.gitignore — `.kakao-tokens.json`</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>카카오 전송은 <strong>서버 OAuth 토큰</strong> 기반이며, 클라이언트 IndexedDB와 무관합니다.</li>
+    <li><code>talk_message</code> 스코프 없이 연동하면 메모 API가 실패할 수 있습니다.</li>
+    <li>토큰 파일은 <code>.gitignore</code> 대상이므로 배포 환경마다 OAuth 재연동이 필요할 수 있습니다.</li>
+  </ul>
+</section>
+
+<section id="messenger-telegram-bot-api">
+  <h2>13. 텔레그램 Bot API</h2>
+  <h3>개요</h3>
+  <p>Auto 모드는 Telegram Bot API <code>sendMessage</code>로 분석 결과를 지정 채팅에 전송합니다. 봇 토큰·Chat ID는 클라이언트 IndexedDB에 저장하고, 실행 시 서버 API로 전달합니다. <code>.env</code>의 <code>TELEGRAM_BOT_TOKEN</code>은 연동 상태 표시용이며 실제 전송은 UI에 등록한 토큰을 우선합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>번들별로 텔레그램 수신 채널·봇을 선택해 결과 알림</li>
+    <li>Bot API 직접 호출로 별도 웹훅 서버 없이 단방향 메시지 전송</li>
+    <li>긴 LLM 출력을 4,000자 청크로 분할 전송</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td><code>sendMessage</code> / <code>sendMessageChunked</code></td><td>Bot API 호출·청크 전송</td><td><code>src/lib/server/telegram.ts</code></td></tr><tr><td><code>telegramConfigsStore</code></td><td>봇·채팅 목록 CRUD·IndexedDB 저장</td><td><code>src/lib/stores/telegramConfigs.svelte.ts</code></td></tr><tr><td><code>GET /api/auto/telegram/status</code></td><td><code>.env</code> 토큰 설정 여부</td><td><code>src/routes/api/auto/telegram/status/+server.ts</code></td></tr><tr><td><code>POST /api/auto/telegram/test</code></td><td>테스트 메시지</td><td><code>src/routes/api/auto/telegram/test/+server.ts</code></td></tr><tr><td><code>autoStore.executeBundle</code></td><td>봇/채팅 ID → 토큰·chatId resolve</td><td><code>src/lib/stores/auto.svelte.ts</code></td></tr><tr><td><code>scheduler.executeBundle</code></td><td><code>telegramEnabled</code> 시 전송</td><td><code>src/lib/server/scheduler.ts</code></td></tr><tr><td><code>TelegramSettingsModal</code></td><td>봇·채팅 UI 설정</td><td><code>src/lib/components/auto/TelegramSettingsModal.svelte</code></td></tr></tbody></table>
+  <h3>데이터 모델</h3>
+  <h3>IndexedDB 키</h3>
+  <table><thead><tr><th>키</th><th>타입</th><th>필드</th></tr></thead><tbody><tr><td><code>jukimbot-telegram-bots</code></td><td><code>TelegramBotConfig[]</code></td><td><code>id</code>, <code>name</code>, <code>botToken</code></td></tr><tr><td><code>jukimbot-telegram-chats</code></td><td><code>TelegramChatConfig[]</code></td><td><code>id</code>, <code>name</code>, <code>chatId</code></td></tr></tbody></table>
+  <h3>AutoBundle 텔레그램 필드</h3>
+  <table><thead><tr><th>필드</th><th>설명</th></tr></thead><tbody><tr><td><code>telegramEnabled</code></td><td>전송 활성화</td></tr><tr><td><code>telegramBotId</code></td><td><code>TelegramBotConfig.id</code> 참조</td></tr><tr><td><code>telegramChatId</code></td><td><code>TelegramChatConfig.id</code> 참조 (chatId 문자열이 아님)</td></tr></tbody></table>
+  <p>실행 시 <code>telegramConfigsStore.getBotById</code> / <code>getChatById</code>로 실제 <code>botToken</code>·<code>chatId</code> 문자열을 resolve해 API 본문에 넣습니다.</p>
+  <h3>Bot API 호출</h3>
+  <h3>엔드포인트</h3>
+  <pre><code>POST https://api.telegram.org/bot{token}/sendMessage</code></pre>
+  <h3>요청 파라미터 (`URLSearchParams`)</h3>
+  <table><thead><tr><th>파라미터</th><th>값</th></tr></thead><tbody><tr><td><code>chat_id</code></td><td>수신 채팅 ID (문자열)</td></tr><tr><td><code>text</code></td><td>메시지 본문 (<code>[제목]\n본문</code> 형식)</td></tr><tr><td><code>disable_web_page_preview</code></td><td><code>true</code></td></tr></tbody></table>
+  <h3>타임아웃·에러</h3>
+  <ul>
+    <li><code>REQUEST_TIMEOUT_MS</code>: 25초 (<code>AbortController</code>)</li>
+    <li>실패 시 Telegram JSON의 <code>description</code> 필드를 에러 메시지로 반환</li>
+  </ul>
+  <h3>청크 전송</h3>
+  <table><thead><tr><th>상수</th><th>값</th></tr></thead><tbody><tr><td><code>CHUNK_SIZE</code></td><td>4000</td></tr><tr><td><code>SEND_DELAY_MS</code></td><td>300</td></tr></tbody></table>
+  <p>분할: <code>\n\n</code> 또는 <code>\n</code> (절반 이상 위치) 우선, 없으면 <code>maxLen</code>에서 절단. 다중 청크 시 <code>[제목] (i/N)</code> 접두사.</p>
+  <p><code>sendMessage(title, text)</code> → 내부적으로 <code>sendMessageChunked</code> with <code>alreadyFormatted=true</code>.</p>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    participant UI as BundleEditor
+    participant Store as autoStore
+    participant TgStore as telegramConfigsStore
+    participant API as /api/auto/execute
+    participant Sched as scheduler.ts
+    participant TG as api.telegram.org
+
+    UI->>Store: Run Now (telegramEnabled)
+    Store->>TgStore: getBotById / getChatById
+    Store->>API: POST { telegramBotToken, telegramChatId, ... }
+    API->>Sched: executeBundle(...)
+    alt telegramEnabled && token && chatId && result
+        Sched->>TG: sendMessage (chunked)
+        TG-->>Sched: ok
+    end
+    Sched-->>API: telegramSent, telegramError
+    API-->>Store: JSON result
+  </pre></div>
+  <h3>스케줄 실행</h3>
+  <p><code>POST /api/auto/schedule</code> <code>action: start</code> 시에도 동일하게 <code>telegramBotToken</code>·<code>telegramChatId</code>(실제 chat_id 문자열)를 서버 <code>ScheduledTask</code>에 저장합니다. 스케줄러가 주기 실행 시 같은 전송 조건을 적용합니다.</p>
+  <h3>전송 조건 (`scheduler.ts`)</h3>
+  <pre><code>telegramEnabled &amp;&amp; telegramBotToken &amp;&amp; telegramChatId &amp;&amp; researchResultText</code></pre>
+  <p>토큰 또는 chatId 누락 시 경고 로그, <code>telegramSent: false</code>.</p>
+  <p>카카오와 달리 <strong>번들별 <code>telegramEnabled</code> 플래그</strong>로 on/off 합니다.</p>
+  <h3>API 엔드포인트</h3>
+  <table><thead><tr><th>경로</th><th>메서드</th><th>요청</th><th>응답</th></tr></thead><tbody><tr><td><code>/api/auto/telegram/status</code></td><td>GET</td><td>—</td><td><code>{ configured: boolean }</code> — <code>.env</code> <code>TELEGRAM_BOT_TOKEN</code> 존재</td></tr><tr><td><code>/api/auto/telegram/test</code></td><td>POST</td><td><code>{ chatId, botToken? }</code></td><td><code>{ success }</code> 또는 <code>{ success: false, error }</code></td></tr></tbody></table>
+  <p>테스트 API는 <code>botToken</code>이 비어 있으면 <code>resolveToken(undefined)</code> → 빈 문자열 → 전송 실패. UI 테스트는 항상 선택한 봇 토큰을 본문에 포함합니다.</p>
+  <h3>사용 방법</h3>
+  <h3>봇·Chat ID 준비</h3>
+  <ol>
+    <li>[@BotFather](https://t.me/BotFather)에서 봇 생성 → 토큰 발급</li>
+    <li>대상 채팅에 봇 초대 (그룹/채널) 또는 개인 DM</li>
+    <li>Chat ID 확인 (예: [@userinfobot](https://t.me/userinfobot) 등)</li>
+  </ol>
+  <h3>UI 설정</h3>
+  <ol>
+    <li>Auto → Telegram 설정 모달에서 봇·수신처 등록 (<code>telegramConfigsStore</code>)</li>
+    <li>번들 편집기에서 <code>telegramEnabled</code> 체크 후 봇·채팅 선택</li>
+    <li>"Test Telegram" → <code>POST /api/auto/telegram/test</code></li>
+  </ol>
+  <h3>환경 변수 (선택)</h3>
+  <p><code>.env</code>의 <code>TELEGRAM_BOT_TOKEN</code>은 <code>/api/auto/telegram/status</code>의 <code>configured</code>만 영향. <code>.env.example</code> 주석: 실제 전송은 UI 설정 사용.</p>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/telegram.ts — Bot API 클라이언트</li>
+    <li>src/lib/stores/telegramConfigs.svelte.ts — 봇·채팅 저장</li>
+    <li>src/lib/types/auto.ts — `TelegramBotConfig`, `TelegramChatConfig`, `AutoBundle`</li>
+    <li>src/routes/api/auto/telegram/ — status, test</li>
+    <li>src/routes/api/auto/execute/+server.ts — Run Now 시 토큰·chatId 수신</li>
+    <li>src/routes/api/auto/schedule/+server.ts — 스케줄 등록 시 토큰·chatId 수신</li>
+    <li>src/lib/server/scheduler.ts — 전송 오케스트레이션</li>
+    <li>src/lib/components/auto/TelegramSettingsModal.svelte — 설정 UI</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>텔레그램은 <strong>인바운드 웹훅을 사용하지 않습니다</strong>. 서버→Telegram 단방향 <code>sendMessage</code>만 구현되어 있습니다.</li>
+    <li>봇 토큰은 클라이언트 IndexedDB에 평문 저장됩니다. 공유 PC 사용 시 주의하세요.</li>
+    <li><code>autoStore.executeBundle</code>은 텔레그램 미설정 시 <code>console.warn</code>만 출력하고 API 호출은 계속합니다 (서버에서 전송 스킵).</li>
+  </ul>
+</section>
+
+<section id="storage-indexeddb-keys-migration">
+  <h2>14. IndexedDB 키·마이그레이션</h2>
+  <h3>개요</h3>
+  <p>JukimBot은 브라우저 클라이언트 데이터를 IndexedDB 단일 KV 스토어에 저장합니다. Chat·Auto·Telegram 설정은 <code>localStorage</code>에서 IndexedDB로 이전하는 런타임 마이그레이션을 수행합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>대용량 대화·번들 데이터를 <code>localStorage</code> 한도(약 5MB)보다 넉넉한 IndexedDB에 보관</li>
+    <li>단일 KV 스토어로 키-값 CRUD를 단순화</li>
+    <li>기존 <code>localStorage</code> 사용자 데이터를 자동 이전해 업그레이드 시 데이터 손실 방지</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td><code>DB_NAME</code> / <code>DB_VERSION</code> / <code>STORE_NAME</code></td><td>DB·버전·오브젝트 스토어 상수</td><td><code>src/lib/db/constants.ts</code></td></tr><tr><td><code>openDb()</code></td><td>DB 연결·<code>onupgradeneeded</code>에서 스토어 생성</td><td><code>src/lib/db/openDb.ts</code></td></tr><tr><td><code>getItem</code> / <code>setItem</code> / <code>removeItem</code></td><td>KV CRUD (값은 문자열)</td><td><code>src/lib/db/indexedDb.ts</code></td></tr><tr><td><code>chatStore</code></td><td>대화 목록 저장·로드</td><td><code>src/lib/stores/chat.svelte.ts</code></td></tr><tr><td><code>autoStore</code></td><td>Auto 번들 저장·로드</td><td><code>src/lib/stores/auto.svelte.ts</code></td></tr><tr><td><code>telegramConfigsStore</code></td><td>텔레그램 봇·채팅 설정</td><td><code>src/lib/stores/telegramConfigs.svelte.ts</code></td></tr></tbody></table>
+  <h3>데이터베이스 스키마</h3>
+  <table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><td>데이터베이스 이름</td><td><code>jukimbot-db</code></td></tr><tr><td>버전</td><td><code>1</code></td></tr><tr><td>오브젝트 스토어</td><td><code>kv</code> (키 경로 인덱스, <code>put(value, key)</code> 패턴)</td></tr><tr><td>값 타입</td><td>문자열 (<code>JSON.stringify</code> 결과를 저장)</td></tr></tbody></table>
+  <p><code>openDb()</code>의 <code>onupgradeneeded</code>는 <code>kv</code> 스토어가 없을 때만 <code>createObjectStore('kv')</code>를 호출합니다. 버전 1 이상으로 올릴 때 추가 마이그레이션 로직은 아직 없습니다.</p>
+  <h3>저장 키 목록</h3>
+  <table><thead><tr><th>키</th><th>저장 주체</th><th>값 형식</th><th>설명</th></tr></thead><tbody><tr><td><code>jukimbot-chat-conversations</code></td><td><code>chatStore</code></td><td><code>Conversation[]</code> JSON</td><td>채팅 대화·메시지</td></tr><tr><td><code>jukimbot-auto-bundles</code></td><td><code>autoStore</code></td><td><code>AutoBundle[]</code> JSON</td><td>Auto 번들·스케줄·실행 이력</td></tr><tr><td><code>jukimbot-telegram-bots</code></td><td><code>telegramConfigsStore</code></td><td><code>TelegramBotConfig[]</code> JSON</td><td>텔레그램 봇 이름·토큰</td></tr><tr><td><code>jukimbot-telegram-chats</code></td><td><code>telegramConfigsStore</code></td><td><code>TelegramChatConfig[]</code> JSON</td><td>텔레그램 수신처 이름·chatId</td></tr></tbody></table>
+  <h3>localStorage 전용 (IndexedDB 미사용)</h3>
+  <table><thead><tr><th>키</th><th>저장 주체</th><th>설명</th></tr></thead><tbody><tr><td><code>jukimbot-llm-provider</code></td><td><code>llmStore</code></td><td>선택된 LLM 제공자 (<code>local</code> / <code>omniroute</code>)</td></tr></tbody></table>
+  <h3>마이그레이션 동작</h3>
+  <h3>Chat·Auto: localStorage → IndexedDB</h3>
+  <p><code>loadFromStorage()</code> 공통 패턴:</p>
+  <ol>
+    <li>IndexedDB에서 키 조회</li>
+    <li>값이 없으면 <code>localStorage.getItem(같은 키)</code> 시도</li>
+    <li><code>localStorage</code>에 데이터가 있으면 IndexedDB에 <code>setItem</code> 후 <code>localStorage.removeItem</code></li>
+    <li>JSON 파싱 후 스토어 상태 복원</li>
+  </ol>
+  <p>Chat은 <code>createdAt</code>·<code>updatedAt</code>·<code>timestamp</code>를 <code>Date</code>로 변환하고 <code>isStreaming: false</code>로 정규화합니다. Auto는 <code>scheduleType</code>·<code>telegramEnabled</code> 등 필드 기본값을 보정합니다.</p>
+  <h3>Telegram: localStorage + 레거시 키 통합</h3>
+  <p><code>telegramConfigsStore.loadFromStorage()</code>:</p>
+  <ol>
+    <li>IndexedDB에서 <code>jukimbot-telegram-bots</code>·<code>jukimbot-telegram-chats</code> 조회</li>
+    <li>둘 다 없으면 <code>localStorage</code>에서 동일 키 + 레거시 <code>jukimbot-telegram-configs</code> 조회</li>
+    <li>IndexedDB로 복사 후 <code>localStorage</code> 키 삭제</li>
+    <li>레거시 <code>jukimbot-telegram-configs</code>가 있으면 단일 배열에서 봇·채팅 항목을 분리해 새 구조로 변환 후 <code>removeItem(OLD_CONFIGS_KEY)</code></li>
+  </ol>
+  <p>레거시 항목 형식: <code>{ name, botToken?, chatId? }[]</code></p>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    participant Browser
+    participant Store as chatStore / autoStore / telegramConfigsStore
+    participant IDB as IndexedDB kv
+    participant LS as localStorage
+
+    Browser->>Store: loadFromStorage()
+    Store->>IDB: getItem(KEY)
+    alt IndexedDB에 없음
+        Store->>LS: getItem(KEY)
+        LS-->>Store: legacy JSON
+        Store->>IDB: setItem(KEY, data)
+        Store->>LS: removeItem(KEY)
+    end
+    Store-->>Browser: 상태 복원
+
+    Note over Store,IDB: persist() 시 setItem(KEY, JSON.stringify(...))
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>개발자: 새 클라이언트 데이터 추가</h3>
+  <ol>
+    <li><code>src/lib/db</code>의 <code>getItem</code> / <code>setItem</code> 사용</li>
+    <li>키는 <code>jukimbot-{도메인}-{엔티티}</code> kebab-case 권장</li>
+    <li><code>browser</code> 가드 후 <code>loadFromStorage</code> / <code>persist</code> 패턴 따르기</li>
+    <li>스키마 변경 시 <code>DB_VERSION</code> 증가 + <code>onupgradeneeded</code>에 변환 로직 추가</li>
+  </ol>
+  <h3>DB 버전 업그레이드 (미구현 시 참고)</h3>
+  <p>현재 <code>DB_VERSION = 1</code>이며 스토어 생성만 수행합니다. 키 구조 변경이나 스토어 분리가 필요하면 <code>constants.ts</code>의 버전을 올리고 <code>openDb.ts</code>의 <code>onupgradeneeded</code>에서 이전 버전별 분기를 구현해야 합니다.</p>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/db/constants.ts — DB 이름·버전·스토어명</li>
+    <li>src/lib/db/openDb.ts — 연결·업그레이드 훅</li>
+    <li>src/lib/db/indexedDb.ts — KV API</li>
+    <li>src/lib/db/index.ts — re-export</li>
+    <li>src/lib/stores/chat.svelte.ts — `jukimbot-chat-conversations`</li>
+    <li>src/lib/stores/auto.svelte.ts — `jukimbot-auto-bundles`</li>
+    <li>src/lib/stores/telegramConfigs.svelte.ts — 텔레그램 키·레거시 마이그레이션</li>
+    <li>src/lib/stores/llm.svelte.ts — localStorage 전용 LLM 제공자</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>IndexedDB는 브라우저별 origin에 격리됩니다. 서버 사이드에서는 접근할 수 없습니다.</li>
+    <li><code>persist()</code> 실패(quota exceeded 등)는 <code>.catch(() =&gt; {})</code>로 무시됩니다.</li>
+    <li>텔레그램 봇 토큰은 IndexedDB(클라이언트)에 저장되므로 민감 정보 취급에 유의하세요.</li>
+  </ul>
+</section>
+
+<section id="storage-server-file-storage">
+  <h2>15. 서버 파일 저장</h2>
+  <h3>개요</h3>
+  <p>서버(Node.js) 측 영구 저장은 파일 시스템을 사용합니다. 현재 구현된 서버 파일 저장은 카카오 OAuth 토큰(<code>.kakao-tokens.json</code>)뿐이며, Auto 번들·채팅 데이터는 클라이언트 IndexedDB에만 존재합니다.</p>
+  <h3>목적</h3>
+  <ul>
+    <li>카카오 OAuth access/refresh 토큰을 서버 프로세스 재시작 후에도 유지</li>
+    <li>OAuth 연동 상태를 파일 기반으로 관리해 별도 DB 없이 운영</li>
+  </ul>
+  <h3>주요 구성요소</h3>
+  <table><thead><tr><th>구성요소</th><th>역할</th><th>관련 경로</th></tr></thead><tbody><tr><td><code>TOKEN_FILE</code></td><td>토큰 파일 경로 (프로젝트 루트)</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td><code>loadTokens</code> / <code>saveTokens</code> / <code>clearTokens</code></td><td>읽기·쓰기·삭제</td><td><code>src/lib/server/kakao.ts</code></td></tr><tr><td><code>.gitignore</code></td><td>토큰 파일 커밋 제외</td><td><code>.gitignore</code></td></tr></tbody></table>
+  <h3>파일 상세</h3>
+  <h3>`.kakao-tokens.json`</h3>
+  <table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><td>경로</td><td>프로젝트 루트 (<code>path.resolve('.kakao-tokens.json')</code>)</td></tr><tr><td>형식</td><td>JSON</td></tr><tr><td>Git 추적</td><td>제외 (<code>.gitignore</code>)</td></tr></tbody></table>
+  <p><strong>저장 필드 (<code>KakaoTokens</code> 인터페이스)</strong></p>
+  <table><thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead><tbody><tr><td><code>access_token</code></td><td>string</td><td>카카오 API 호출용 액세스 토큰</td></tr><tr><td><code>refresh_token</code></td><td>string</td><td>액세스 토큰 갱신용</td></tr><tr><td><code>expires_at</code></td><td>number</td><td>만료 시각 (Unix ms, <code>Date.now() + expires_in * 1000</code>)</td></tr></tbody></table>
+  <h3>읽기·쓰기 규칙</h3>
+  <ul>
+    <li><strong>로드</strong>: 파일 없음·파싱 실패·필수 필드 누락 시 <code>null</code> 반환</li>
+    <li><strong>저장</strong>: <code>JSON.stringify(tokens, null, 2)</code>로 포맷팅 후 <code>writeFileSync</code></li>
+    <li><strong>삭제</strong>: refresh 실패 시 <code>clearTokens()</code>로 파일 삭제 → 재연동 필요</li>
+  </ul>
+  <h3>동작 흐름</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+    participant OAuth as Kakao OAuth
+    participant Callback as /api/auto/kakao/callback
+    participant Kakao as kakao.ts
+    participant FS as .kakao-tokens.json
+    participant API as kapi.kakao.com
+
+    OAuth->>Callback: authorization code
+    Callback->>Kakao: exchangeCode(code)
+    Kakao->>OAuth: POST /oauth/token
+    OAuth-->>Kakao: access_token, refresh_token, expires_in
+    Kakao->>FS: saveTokens()
+
+    Note over Kakao,API: 이후 메시지 전송 시
+    Kakao->>FS: loadTokens()
+    alt expires_at 경과
+        Kakao->>OAuth: refresh_token grant
+        OAuth-->>Kakao: new access_token
+        Kakao->>FS: saveTokens()
+    end
+    Kakao->>API: send memo (Bearer access_token)
+  </pre></div>
+  <h3>사용 방법</h3>
+  <h3>최초 연동</h3>
+  <ol>
+    <li><code>.env</code>에 <code>KAKAO_REST_API_KEY</code> 설정 (<code>.env.example</code> 참고)</li>
+    <li>카카오 개발자 콘솔에 Redirect URI 등록: <code>{origin}/api/auto/kakao/callback</code></li>
+    <li>UI에서 "Connect Kakao Talk" → <code>GET /api/auto/kakao/connect</code> → OAuth 완료 후 콜백에서 토큰 파일 생성</li>
+  </ol>
+  <h3>연동 상태 확인</h3>
+  <p><code>GET /api/auto/kakao/status</code> 응답:</p>
+  <table><thead><tr><th>필드</th><th>설명</th></tr></thead><tbody><tr><td><code>configured</code></td><td><code>KAKAO_REST_API_KEY</code> 존재 여부</td></tr><tr><td><code>connected</code></td><td>토큰 존재 및 (만료 시 refresh_token 보유)</td></tr><tr><td><code>hasTokens</code></td><td>파일에 토큰 레코드 존재</td></tr><tr><td><code>tokenExpired</code></td><td><code>expires_at</code> 경과 여부</td></tr><tr><td><code>expiresAt</code></td><td>만료 시각 ISO 문자열</td></tr></tbody></table>
+  <h3>토큰 초기화</h3>
+  <p>파일을 수동 삭제하거나 refresh 실패 시 서버가 <code>clearTokens()</code>를 호출합니다. 이후 UI에서 카카오 재연동이 필요합니다.</p>
+  <h3>관련 파일</h3>
+  <h4>주요 소스 파일</h4>
+  <ul class="source-list">
+    <li>src/lib/server/kakao.ts — 토큰 파일 I/O·OAuth·메시지 전송</li>
+    <li>src/routes/api/auto/kakao/callback/+server.ts — OAuth 콜백 → `exchangeCode`</li>
+    <li>src/routes/api/auto/kakao/status/+server.ts — 연결 상태 API</li>
+    <li>.env.example — `KAKAO_REST_API_KEY` 설정 안내</li>
+    <li>.gitignore — `.kakao-tokens.json` 제외</li>
+  </ul>
+  <h3>참고</h3>
+  <ul>
+    <li>텔레그램 봇 토큰은 서버 파일이 아닌 <strong>클라이언트 IndexedDB</strong>(<code>jukimbot-telegram-bots</code>) 또는 요청 본문으로 전달됩니다. <code>.env</code>의 <code>TELEGRAM_BOT_TOKEN</code>은 <code>/api/auto/telegram/status</code>의 <code>configured</code> 표시용이며 실제 전송은 UI 설정 토큰을 우선합니다.</li>
+    <li>서버 스케줄러는 메모리 내 <code>ScheduledTask</code> 맵만 사용하며 디스크에 스케줄을 저장하지 않습니다. 재시작 영향·복원 방안은 [auto/scheduler-persistence.md](../auto/scheduler-persistence.md)를 참고하세요.</li>
+  </ul>
+</section>
 
 </div>
 
